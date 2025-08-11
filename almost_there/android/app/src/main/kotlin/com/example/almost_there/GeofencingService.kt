@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
@@ -16,6 +17,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.android.gms.location.*
 import kotlinx.coroutines.*
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.math.roundToInt
 
 class GeofencingService : Service() {
@@ -36,9 +39,11 @@ class GeofencingService : Service() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
+    private lateinit var hiddenAlarmsPrefs: SharedPreferences
     private var currentLocation: Location? = null
     private val activeAlarms = mutableMapOf<String, AlarmData>()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     data class AlarmData(
         val id: String,
@@ -54,8 +59,10 @@ class GeofencingService : Service() {
         Log.d(TAG, "GeofencingService created")
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        hiddenAlarmsPrefs = getSharedPreferences("hidden_live_cards", Context.MODE_PRIVATE)
         createNotificationChannels()
         setupLocationCallback()
+        cleanupExpiredHiddenAlarms()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -67,6 +74,12 @@ class GeofencingService : Service() {
                 startLiveCardTracking(alarms)
             }
             ACTION_STOP_LIVE_CARDS -> stopLiveCardTracking()
+            "HIDE_LIVE_CARD" -> {
+                val alarmId = intent.getStringExtra("alarmId")
+                if (alarmId != null) {
+                    handleHideLiveCard(alarmId)
+                }
+            }
             ACTION_ALARM_TRIGGERED -> {
                 val alarmId = intent.getStringExtra("alarmId")
                 if (alarmId != null) {
@@ -207,12 +220,20 @@ class GeofencingService : Service() {
         serviceScope.launch {
             try {
                 activeAlarms.clear()
+                val todayKey = getTodayKey()
+                
                 alarmData?.forEach { alarmMap ->
                     val id = alarmMap["id"] as? String ?: return@forEach
                     val label = alarmMap["label"] as? String ?: "Unknown"
                     val latitude = alarmMap["latitude"] as? Double ?: return@forEach
                     val longitude = alarmMap["longitude"] as? Double ?: return@forEach
                     val radius = alarmMap["radius"] as? Double ?: 300.0
+                    
+                    // Skip if alarm is hidden for today
+                    if (isAlarmHiddenToday(id)) {
+                        Log.d(TAG, "Skipping hidden alarm for today: $label")
+                        return@forEach
+                    }
                     
                     val alarm = AlarmData(
                         id = id,
@@ -224,7 +245,7 @@ class GeofencingService : Service() {
                     activeAlarms[id] = alarm
                     Log.d(TAG, "Loaded alarm: $label at ($latitude, $longitude) radius: ${radius}m")
                 }
-                Log.d(TAG, "Loaded ${activeAlarms.size} active alarms")
+                Log.d(TAG, "Loaded ${activeAlarms.size} active alarms (after filtering hidden)")
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading active alarms", e)
             }
@@ -259,10 +280,23 @@ class GeofencingService : Service() {
         
         val eta = estimateETA(distance)
         
+        // Create intent to open the app when notification is tapped
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("alarmId", alarmData.id) // Pass alarm ID to potentially navigate to specific alarm
+        }
+        val pendingOpenAppIntent = PendingIntent.getActivity(
+            this, 
+            alarmData.id.hashCode(), 
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        
         val notification = NotificationCompat.Builder(this, LIVE_CARD_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("${alarmData.label} — เหลือ $formattedDistance")
             .setContentText("จุดเตือน: ${formatRadius(alarmData.radius)} | ETA ~$eta")
+            .setContentIntent(pendingOpenAppIntent) // Add tap action
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
@@ -288,6 +322,25 @@ class GeofencingService : Service() {
         Log.d(TAG, "Alarm dismissed: $alarmId")
         activeAlarms.remove(alarmId)
         clearLiveCard(alarmId)
+        
+        // Stop service if no more active alarms
+        if (activeAlarms.isEmpty()) {
+            stopLiveCardTracking()
+        }
+    }
+
+    private fun handleHideLiveCard(alarmId: String) {
+        Log.d(TAG, "Hiding live card for today: $alarmId")
+        
+        // Persist hidden state for today
+        setAlarmHiddenToday(alarmId)
+        
+        // Remove from active tracking for today only
+        activeAlarms.remove(alarmId)
+        clearLiveCard(alarmId)
+        
+        // Note: For recurring alarms, this only hides for today
+        // The alarm remains enabled and will show again tomorrow
         
         // Stop service if no more active alarms
         if (activeAlarms.isEmpty()) {
@@ -386,5 +439,41 @@ class GeofencingService : Service() {
         } else {
             "${radius.roundToInt()} ม."
         }
+    }
+
+    // Helper methods for "Hide today" persistence
+    private fun getTodayKey(): String {
+        return dateFormat.format(Date())
+    }
+
+    private fun isAlarmHiddenToday(alarmId: String): Boolean {
+        val todayKey = getTodayKey()
+        return hiddenAlarmsPrefs.getStringSet(todayKey, emptySet())?.contains(alarmId) == true
+    }
+
+    private fun setAlarmHiddenToday(alarmId: String) {
+        val todayKey = getTodayKey()
+        val hiddenAlarms = hiddenAlarmsPrefs.getStringSet(todayKey, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        hiddenAlarms.add(alarmId)
+        hiddenAlarmsPrefs.edit().putStringSet(todayKey, hiddenAlarms).apply()
+        Log.d(TAG, "Marked alarm $alarmId as hidden for today ($todayKey)")
+    }
+
+    private fun cleanupExpiredHiddenAlarms() {
+        // Remove hidden alarm entries older than 7 days to prevent storage bloat
+        val allKeys = hiddenAlarmsPrefs.all.keys
+        val sevenDaysAgo = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -7)
+        }.time
+        val cutoffDate = dateFormat.format(sevenDaysAgo)
+
+        val editor = hiddenAlarmsPrefs.edit()
+        allKeys.forEach { key ->
+            if (key < cutoffDate) {
+                editor.remove(key)
+                Log.d(TAG, "Cleaned up expired hidden alarms for date: $key")
+            }
+        }
+        editor.apply()
     }
 }
