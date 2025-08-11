@@ -90,7 +90,7 @@ class GeofenceReceiver : BroadcastReceiver() {
         try {
             // Create notification for alarm trigger
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("ถึงใกล้ปลายทางแล้ว!")
                 .setContentText("คุณใกล้ถึงจุดหมายของ $alarmId แล้ว")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -98,17 +98,17 @@ class GeofenceReceiver : BroadcastReceiver() {
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .addAction(
-                    android.R.drawable.ic_dialog_info,
+                    R.mipmap.ic_launcher,
                     "Snooze 5m",
                     createSnoozeIntent(context, alarmId, 5)
                 )
                 .addAction(
-                    android.R.drawable.ic_dialog_info,
+                    R.mipmap.ic_launcher,
                     "Dismiss",
                     createDismissIntent(context, alarmId)
                 )
                 .addAction(
-                    android.R.drawable.ic_dialog_info,
+                    R.mipmap.ic_launcher,
                     "Open Map",
                     createOpenMapIntent(context, alarmId)
                 )

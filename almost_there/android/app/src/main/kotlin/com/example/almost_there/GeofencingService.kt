@@ -221,7 +221,7 @@ class GeofencingService : Service() {
         val eta = estimateETA(distance)
         
         val notification = NotificationCompat.Builder(this, LIVE_CARD_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("${alarmData.label} — เหลือ $formattedDistance")
             .setContentText("จุดเตือน: ${formatRadius(alarmData.radius)} | ETA ~$eta")
             .setOngoing(true)
@@ -270,7 +270,7 @@ class GeofencingService : Service() {
         return NotificationCompat.Builder(this, "geofencing_service")
             .setContentTitle("Almost There!")
             .setContentText("กำลังติดตามตำแหน่งสำหรับการแจ้งเตือน")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -287,7 +287,7 @@ class GeofencingService : Service() {
             this, alarmId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-        return NotificationCompat.Action(android.R.drawable.ic_dialog_info, "Snooze 5m", pendingIntent)
+        return NotificationCompat.Action(R.mipmap.ic_launcher, "Snooze 5m", pendingIntent)
     }
 
     private fun createHideAction(alarmId: String): NotificationCompat.Action {
@@ -299,7 +299,7 @@ class GeofencingService : Service() {
             this, alarmId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-        return NotificationCompat.Action(android.R.drawable.ic_dialog_info, "Hide today", pendingIntent)
+        return NotificationCompat.Action(R.mipmap.ic_launcher, "Hide today", pendingIntent)
     }
 
     private fun createStopAction(alarmId: String): NotificationCompat.Action {
@@ -311,7 +311,7 @@ class GeofencingService : Service() {
             this, alarmId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-        return NotificationCompat.Action(android.R.drawable.ic_dialog_info, "Stop", pendingIntent)
+        return NotificationCompat.Action(R.mipmap.ic_launcher, "Stop", pendingIntent)
     }
 
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
