@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../../data/models/alarm_model.dart';
 import '../../../data/models/location_model.dart';
@@ -24,6 +26,7 @@ class AddEditAlarmScreen extends ConsumerStatefulWidget {
 class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
   final _formKey = GlobalKey<FormState>();
   final _labelController = TextEditingController();
+  late AudioPlayer _audioPlayer;
   
   late AlarmType _selectedType;
   late bool _enabled;
@@ -41,6 +44,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
   @override
   void initState() {
     super.initState();
+    _audioPlayer = AudioPlayer();
     
     if (_isEditing) {
       // Initialize with existing alarm data
@@ -70,6 +74,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
 
   @override
   void dispose() {
+    _audioPlayer.dispose();
     _labelController.dispose();
     super.dispose();
   }
@@ -300,11 +305,41 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
     );
   }
 
-  void _previewSound() {
-    // TODO: Implement sound preview
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('การฟังตัวอย่างเสียงจะพร้อมใช้งานเร็วๆ นี้')),
-    );
+  void _previewSound() async {
+    try {
+      // Play notification sound using just_audio with a URL sound
+      // Using a free notification sound from the web
+      const soundUrl = 'https://www.soundjay.com/misc/sounds-2/bell_1.mp3';
+      
+      await _audioPlayer.setUrl(soundUrl);
+      await _audioPlayer.play();
+      
+      // Provide haptic feedback as well
+      HapticFeedback.mediumImpact();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('กำลังเล่นตัวอย่างเสียง: $_soundPath'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // Fallback to haptic feedback only if sound fails
+      HapticFeedback.mediumImpact();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เล่นเสียงไม่ได้ ใช้การสั่นแทน: $_soundPath'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   void _saveAlarm() async {

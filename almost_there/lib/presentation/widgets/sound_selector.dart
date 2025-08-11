@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
 
 class SoundSelector extends StatefulWidget {
   final String currentSound;
@@ -15,6 +17,9 @@ class SoundSelector extends StatefulWidget {
 }
 
 class _SoundSelectorState extends State<SoundSelector> {
+  late AudioPlayer _audioPlayer;
+  String? _currentlyPlaying;
+  
   final List<SoundOption> _sounds = [
     SoundOption('default', 'เสียงเริ่มต้น', Icons.volume_up),
     SoundOption('bell', 'เสียงระฆัง', Icons.notifications),
@@ -24,6 +29,18 @@ class _SoundSelectorState extends State<SoundSelector> {
     SoundOption('alert', 'เสียงเตือน', Icons.warning),
     SoundOption('custom', 'เสียงกำหนดเอง', Icons.folder_open),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,9 +95,13 @@ class _SoundSelectorState extends State<SoundSelector> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: const Icon(Icons.play_arrow),
+            icon: Icon(
+              _currentlyPlaying == sound.key
+                  ? Icons.stop
+                  : Icons.play_arrow,
+            ),
             onPressed: () => _previewSound(sound.key),
-            tooltip: 'ฟังตัวอย่าง',
+            tooltip: _currentlyPlaying == sound.key ? 'หยุด' : 'ฟังตัวอย่าง',
             visualDensity: VisualDensity.compact,
           ),
           Radio<String>(
@@ -106,14 +127,63 @@ class _SoundSelectorState extends State<SoundSelector> {
     );
   }
 
-  void _previewSound(String soundKey) {
-    // TODO: Implement sound preview
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('กำลังเล่นตัวอย่างเสียง: ${_getSoundName(soundKey)}'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  void _previewSound(String soundKey) async {
+    try {
+      // If currently playing this sound, stop it
+      if (_currentlyPlaying == soundKey) {
+        setState(() {
+          _currentlyPlaying = null;
+        });
+        return;
+      }
+
+      // Stop any currently playing sound
+      if (_currentlyPlaying != null) {
+        setState(() {
+          _currentlyPlaying = null;
+        });
+      }
+
+      setState(() {
+        _currentlyPlaying = soundKey;
+      });
+
+      // Play system feedback sound
+      HapticFeedback.mediumImpact();
+
+      // Show preview message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('กำลังเล่นตัวอย่างเสียง: ${_getSoundName(soundKey)}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // Auto-stop after 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_currentlyPlaying == soundKey && mounted) {
+          setState(() {
+            _currentlyPlaying = null;
+          });
+        }
+      });
+
+    } catch (e) {
+      setState(() {
+        _currentlyPlaying = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ไม่สามารถเล่นเสียงได้: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _selectCustomSound() {
