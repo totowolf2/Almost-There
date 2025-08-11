@@ -308,6 +308,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   }
 
   void _continueToApp() {
-    Navigator.of(context).pushReplacementNamed('/home');
+    // ใช้ pushNamedAndRemoveUntil เพื่อป้องกันไม่ให้กลับมาหน้า permissions อีก
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
   }
 }

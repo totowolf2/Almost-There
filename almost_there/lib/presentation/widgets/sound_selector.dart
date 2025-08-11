@@ -148,14 +148,14 @@ class _SoundSelectorState extends State<SoundSelector> {
         _currentlyPlaying = soundKey;
       });
 
-      // Play system feedback sound
-      HapticFeedback.mediumImpact();
+      // เล่นเสียงที่แตกต่างกันตามประเภทที่เลือก
+      await _playSpecificSound(soundKey);
 
       // Show preview message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('กำลังเล่นตัวอย่างเสียง: ${_getSoundName(soundKey)}'),
+            content: Text('🔔 เล่นเสียง: ${_getSoundName(soundKey)}'),
             duration: const Duration(seconds: 2),
             backgroundColor: Colors.green,
           ),
@@ -172,18 +172,73 @@ class _SoundSelectorState extends State<SoundSelector> {
       });
 
     } catch (e) {
+      // Fallback เล่นเสียง system
+      SystemSound.play(SystemSoundType.alert);
+      HapticFeedback.mediumImpact();
+      
       setState(() {
         _currentlyPlaying = null;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ไม่สามารถเล่นเสียงได้: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            content: Text('🔔 ตัวอย่างเสียง: ${_getSoundName(soundKey)} (Fallback)'),
+            backgroundColor: Colors.orange,
           ),
         );
       }
     }
+  }
+
+  Future<void> _playSpecificSound(String soundKey) async {
+    // แทนที่จะใช้ notification ให้เล่นเสียงโดยตรงผ่าน SystemSound patterns
+    switch (soundKey) {
+      case 'bell':
+        // เสียงระฆัง - click เดียว
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'chime':
+        // เสียงกิ่ง - click 2 ครั้ง
+        SystemSound.play(SystemSoundType.click);
+        await Future.delayed(const Duration(milliseconds: 300));
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'ding':
+        // เสียงดิง - alert sound
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.mediumImpact();
+        break;
+        
+      case 'gentle':
+        // เสียงนุ่มนวล - click เบา
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'alert':
+        // เสียงเตือน - alert + vibration pattern
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        // เพิ่มการสั่นซ้ำ
+        Future.delayed(const Duration(milliseconds: 500), () {
+          HapticFeedback.heavyImpact();
+        });
+        break;
+        
+      default: // 'default'
+        // เสียงเริ่มต้น - alert standard
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.mediumImpact();
+        break;
+    }
+    
+    // สำหรับในอนาคต: หากมีไฟล์เสียงจริง สามารถใช้ได้:
+    // await _audioPlayer.setAsset('assets/sounds/${soundKey}.mp3');
+    // await _audioPlayer.play();
   }
 
   void _selectCustomSound() {

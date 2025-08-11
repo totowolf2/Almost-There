@@ -307,38 +307,73 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
 
   void _previewSound() async {
     try {
-      // Play notification sound using just_audio with a URL sound
-      // Using a free notification sound from the web
-      const soundUrl = 'https://www.soundjay.com/misc/sounds-2/bell_1.mp3';
-      
-      await _audioPlayer.setUrl(soundUrl);
-      await _audioPlayer.play();
-      
-      // Provide haptic feedback as well
-      HapticFeedback.mediumImpact();
+      // เล่นเสียงที่แตกต่างกันตามที่เลือก
+      await _playSpecificSoundPreview(_soundPath);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('กำลังเล่นตัวอย่างเสียง: $_soundPath'),
+            content: Text('🔔 เล่นเสียง: ${_soundPath == 'default' ? 'เสียงเริ่มต้น' : _soundPath}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
-      // Fallback to haptic feedback only if sound fails
+      // ถ้าเล่นเสียงไม่ได้ ให้ใช้ system sound fallback
+      SystemSound.play(SystemSoundType.alert);
       HapticFeedback.mediumImpact();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เล่นเสียงไม่ได้ ใช้การสั่นแทน: $_soundPath'),
+            content: Text('🔔 ตัวอย่างเสียง: ${_soundPath == 'default' ? 'เสียงเริ่มต้น' : _soundPath}'),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 2),
           ),
         );
       }
+    }
+  }
+  
+  Future<void> _playSpecificSoundPreview(String soundKey) async {
+    // เล่นเสียงโดยตรงผ่าน SystemSound ตามประเภทที่เลือก
+    switch (soundKey) {
+      case 'bell':
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'chime':
+        SystemSound.play(SystemSoundType.click);
+        await Future.delayed(const Duration(milliseconds: 300));
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'ding':
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.mediumImpact();
+        break;
+        
+      case 'gentle':
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+        
+      case 'alert':
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        // เพิ่มการสั่นซ้ำสำหรับเสียงเตือน
+        Future.delayed(const Duration(milliseconds: 500), () {
+          HapticFeedback.heavyImpact();
+        });
+        break;
+        
+      default: // 'default' และอื่นๆ
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.mediumImpact();
+        break;
     }
   }
 
