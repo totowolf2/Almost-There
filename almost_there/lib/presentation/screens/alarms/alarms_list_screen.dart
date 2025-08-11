@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
+import '../../../data/models/alarm_model.dart';
 import '../../providers/alarm_provider.dart';
 import '../../widgets/alarm_item_widget.dart';
 import 'add_edit_alarm_screen.dart';
@@ -15,6 +17,30 @@ class AlarmsListScreen extends ConsumerStatefulWidget {
 class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
   bool _isMultiSelectMode = false;
   final Set<String> _selectedAlarmIds = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    // Check permissions on app startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPermissionsOnStartup();
+    });
+  }
+
+  Future<void> _checkPermissionsOnStartup() async {
+    final locationStatus = await Permission.locationWhenInUse.status;
+    final backgroundLocationStatus = await Permission.locationAlways.status;
+    final notificationStatus = await Permission.notification.status;
+    
+    // If any essential permission is missing, navigate to permissions screen
+    if (!locationStatus.isGranted || 
+        !backgroundLocationStatus.isGranted || 
+        !notificationStatus.isGranted) {
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/permissions');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +73,22 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
                   child: ListTile(
                     leading: Icon(Icons.cleaning_services),
                     title: Text('Cleanup Expired'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'test_alarm',
+                  child: ListTile(
+                    leading: Icon(Icons.bug_report),
+                    title: Text('สร้างปลุกทดสอบ'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'check_permissions',
+                  child: ListTile(
+                    leading: Icon(Icons.security),
+                    title: Text('ตรวจสอบ Permissions'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -210,8 +252,50 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
     });
   }
 
-  void _toggleAlarm(String alarmId, bool enabled) {
-    ref.read(alarmsProvider.notifier).toggleAlarm(alarmId);
+  Future<void> _toggleAlarm(String alarmId, bool enabled) async {
+    print('🔄 [DEBUG] Toggle alarm: $alarmId to enabled: $enabled');
+    
+    try {
+      final alarmNotifier = ref.read(alarmsProvider.notifier);
+      
+      // Update the alarm's enabled state
+      final alarm = ref.read(alarmsProvider).firstWhere((a) => a.id == alarmId);
+      final updatedAlarm = alarm.copyWith(
+        enabled: enabled,
+        // For one-time alarms, set isActive = enabled
+        isActive: alarm.type == AlarmType.oneTime ? enabled : alarm.isActive,
+      );
+      await alarmNotifier.updateAlarm(updatedAlarm);
+      
+      // If we're enabling the alarm, register geofences and start tracking
+      if (enabled) {
+        print('🔄 [DEBUG] Alarm enabled, registering geofences...');
+        await alarmNotifier.registerActiveGeofences();
+        
+        print('🔄 [DEBUG] Starting live card tracking...');
+        final trackingResult = await alarmNotifier.startLiveCardTracking();
+        print('🔄 [DEBUG] Live tracking result: $trackingResult');
+      } else {
+        // If we're disabling the alarm, we should re-register geofences to exclude this one
+        print('🔄 [DEBUG] Alarm disabled, updating geofences...');
+        await alarmNotifier.registerActiveGeofences();
+        
+        // Update live card tracking (may stop if no active alarms)
+        print('🔄 [DEBUG] Updating live card tracking...');
+        final trackingResult = await alarmNotifier.startLiveCardTracking();
+        print('🔄 [DEBUG] Live tracking result: $trackingResult');
+      }
+    } catch (e) {
+      print('🔄 [ERROR] Failed to toggle alarm: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   void _addNewAlarm() {
@@ -239,6 +323,12 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
       case 'cleanup':
         _cleanupExpiredAlarms();
         break;
+      case 'test_alarm':
+        _createTestAlarm();
+        break;
+      case 'check_permissions':
+        _checkPermissions();
+        break;
     }
   }
 
@@ -263,20 +353,69 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
     );
   }
 
-  void _enableSelectedAlarms() {
-    ref.read(alarmsProvider.notifier).enableAlarms(_selectedAlarmIds.toList());
-    _exitMultiSelectMode();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${_selectedAlarmIds.length} alarms enabled')),
-    );
+  Future<void> _enableSelectedAlarms() async {
+    try {
+      final alarmNotifier = ref.read(alarmsProvider.notifier);
+      await alarmNotifier.enableAlarms(_selectedAlarmIds.toList());
+      
+      // Register geofences and start tracking for newly enabled alarms
+      print('🔄 [DEBUG] Multiple alarms enabled, updating geofences...');
+      await alarmNotifier.registerActiveGeofences();
+      
+      print('🔄 [DEBUG] Starting live card tracking...');
+      final trackingResult = await alarmNotifier.startLiveCardTracking();
+      print('🔄 [DEBUG] Live tracking result: $trackingResult');
+      
+      _exitMultiSelectMode();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_selectedAlarmIds.length} alarms enabled')),
+        );
+      }
+    } catch (e) {
+      print('🔄 [ERROR] Failed to enable alarms: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
-  void _disableSelectedAlarms() {
-    ref.read(alarmsProvider.notifier).disableAlarms(_selectedAlarmIds.toList());
-    _exitMultiSelectMode();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${_selectedAlarmIds.length} alarms disabled')),
-    );
+  Future<void> _disableSelectedAlarms() async {
+    try {
+      final alarmNotifier = ref.read(alarmsProvider.notifier);
+      await alarmNotifier.disableAlarms(_selectedAlarmIds.toList());
+      
+      // Update geofences to exclude disabled alarms
+      print('🔄 [DEBUG] Multiple alarms disabled, updating geofences...');
+      await alarmNotifier.registerActiveGeofences();
+      
+      // Update live card tracking (may stop if no active alarms left)
+      print('🔄 [DEBUG] Updating live card tracking...');
+      final trackingResult = await alarmNotifier.startLiveCardTracking();
+      print('🔄 [DEBUG] Live tracking result: $trackingResult');
+      
+      _exitMultiSelectMode();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_selectedAlarmIds.length} alarms disabled')),
+        );
+      }
+    } catch (e) {
+      print('🔄 [ERROR] Failed to disable alarms: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   void _deleteSelectedAlarms() {
@@ -300,6 +439,92 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
               );
             },
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createTestAlarm() async {
+    try {
+      await ref.read(alarmsProvider.notifier).createTestAlarm();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('สร้างปลุกทดสอบเรียบร้อย! ลองเดินไปที่กรุงเทพฯ'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkPermissions() async {
+    try {
+      final permissions = await ref.read(alarmsProvider.notifier).checkPermissions();
+      
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('สถานะ Permissions'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPermissionRow('Location', permissions['location'] ?? false),
+                _buildPermissionRow('Background Location', permissions['background'] ?? false),
+                _buildPermissionRow('Notifications', permissions['notification'] ?? false),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPermissionRow(String name, bool granted) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            granted ? Icons.check_circle : Icons.cancel,
+            color: granted ? Colors.green : Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(name)),
+          Text(
+            granted ? 'อนุญาต' : 'ไม่อนุญาต',
+            style: TextStyle(
+              color: granted ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

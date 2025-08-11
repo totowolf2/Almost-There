@@ -9,6 +9,7 @@ import 'data/models/location_model.dart';
 import 'data/models/settings_model.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/alarms/alarms_list_screen.dart';
+import 'presentation/screens/onboarding/permissions_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,7 +65,11 @@ class AlmostThereApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const AlarmsListScreen(),
+      home: const PermissionsScreen(),
+      routes: {
+        '/home': (context) => const AlarmsListScreen(),
+        '/permissions': (context) => const PermissionsScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }

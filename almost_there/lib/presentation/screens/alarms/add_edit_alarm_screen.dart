@@ -395,6 +395,14 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
         );
       }
 
+      // After saving alarm, register geofences and start live tracking
+      print('🔧 [DEBUG] Alarm saved, registering geofences...');
+      await alarmNotifier.registerActiveGeofences();
+      
+      print('🔧 [DEBUG] Starting live card tracking...');
+      final trackingResult = await alarmNotifier.startLiveCardTracking();
+      print('🔧 [DEBUG] Live tracking result: $trackingResult');
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(

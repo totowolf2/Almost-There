@@ -12,6 +12,7 @@ class GeofencingPlatform {
     int? expirationDuration,
   }) async {
     try {
+      print('🌍 [DEBUG] Adding geofence for alarm: $alarmId at ($latitude, $longitude) radius: ${radius}m');
       final result = await _channel.invokeMethod('addGeofence', {
         'alarmId': alarmId,
         'latitude': latitude,
@@ -19,9 +20,10 @@ class GeofencingPlatform {
         'radius': radius,
         'expirationDuration': expirationDuration,
       });
+      print('🌍 [DEBUG] Geofence add result: $result');
       return result == true;
     } catch (e) {
-      print('Error adding geofence: $e');
+      print('🌍 [ERROR] Error adding geofence: $e');
       return false;
     }
   }
@@ -68,6 +70,44 @@ class GeofencingPlatform {
       return result == true;
     } catch (e) {
       print('Error checking background location permission: $e');
+      return false;
+    }
+  }
+
+  /// Check if the app has notification permission (Android 13+)
+  static Future<bool> hasNotificationPermission() async {
+    try {
+      final result = await _channel.invokeMethod('hasNotificationPermission');
+      return result == true;
+    } catch (e) {
+      print('Error checking notification permission: $e');
+      return false;
+    }
+  }
+
+  /// Start live card tracking service
+  static Future<bool> startLiveCardService(List<Map<String, dynamic>> alarms) async {
+    try {
+      print('📱 [DEBUG] Starting live card service with ${alarms.length} alarms');
+      print('📱 [DEBUG] Alarm data: $alarms');
+      final result = await _channel.invokeMethod('startLiveCardService', {
+        'alarms': alarms,
+      });
+      print('📱 [DEBUG] Live card service start result: $result');
+      return result == true;
+    } catch (e) {
+      print('📱 [ERROR] Error starting live card service: $e');
+      return false;
+    }
+  }
+
+  /// Stop live card tracking service
+  static Future<bool> stopLiveCardService() async {
+    try {
+      final result = await _channel.invokeMethod('stopLiveCardService');
+      return result == true;
+    } catch (e) {
+      print('Error stopping live card service: $e');
       return false;
     }
   }

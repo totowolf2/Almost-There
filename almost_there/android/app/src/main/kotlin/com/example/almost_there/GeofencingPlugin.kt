@@ -5,8 +5,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.Task
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -63,6 +65,9 @@ class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             "removeAllGeofences" -> removeAllGeofences(result)
             "hasLocationPermission" -> hasLocationPermission(result)
             "hasBackgroundLocationPermission" -> hasBackgroundLocationPermission(result)
+            "hasNotificationPermission" -> hasNotificationPermission(result)
+            "startLiveCardService" -> startLiveCardService(call, result)
+            "stopLiveCardService" -> stopLiveCardService(result)
             else -> result.notImplemented()
         }
     }
@@ -78,7 +83,7 @@ class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             val latitude = call.argument<Double>("latitude") ?: 0.0
             val longitude = call.argument<Double>("longitude") ?: 0.0
             val radius = call.argument<Double>("radius") ?: 100.0
-            val expirationDuration = call.argument<Long>("expirationDuration") ?: Geofence.NEVER_EXPIRE
+            val expirationDuration = call.argument<Int>("expirationDuration")?.toLong() ?: Geofence.NEVER_EXPIRE
 
             val geofence = Geofence.Builder()
                 .setRequestId(GEOFENCE_REQ_ID_PREFIX + alarmId)
@@ -181,6 +186,51 @@ class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
 
         return fineLocationGranted && backgroundLocationGranted
+    }
+
+    private fun hasNotificationPermission(result: Result) {
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // Notification permission is granted by default on older versions
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+        result.success(hasPermission)
+    }
+
+    private fun startLiveCardService(call: MethodCall, result: Result) {
+        try {
+            val alarms = call.argument<List<Map<String, Any>>>("alarms")
+            val intent = Intent(context, GeofencingService::class.java).apply {
+                action = GeofencingService.ACTION_START_LIVE_CARDS
+                if (alarms != null) {
+                    putExtra("alarms", ArrayList(alarms))
+                }
+            }
+            context.startForegroundService(intent)
+            Log.d(TAG, "Started live card service with ${alarms?.size ?: 0} alarms")
+            result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting live card service", e)
+            result.error("SERVICE_ERROR", "Failed to start live card service: ${e.message}", null)
+        }
+    }
+
+    private fun stopLiveCardService(result: Result) {
+        try {
+            val intent = Intent(context, GeofencingService::class.java).apply {
+                action = GeofencingService.ACTION_STOP_LIVE_CARDS
+            }
+            context.startService(intent)
+            Log.d(TAG, "Stopped live card service")
+            result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping live card service", e)
+            result.error("SERVICE_ERROR", "Failed to stop live card service: ${e.message}", null)
+        }
     }
 
     private val geofencePendingIntent: PendingIntent by lazy {

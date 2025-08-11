@@ -62,7 +62,10 @@ class GeofencingService : Service() {
         Log.d(TAG, "Service started with action: ${intent?.action}")
         
         when (intent?.action) {
-            ACTION_START_LIVE_CARDS -> startLiveCardTracking()
+            ACTION_START_LIVE_CARDS -> {
+                val alarms = intent.getSerializableExtra("alarms") as? ArrayList<Map<String, Any>>
+                startLiveCardTracking(alarms)
+            }
             ACTION_STOP_LIVE_CARDS -> stopLiveCardTracking()
             ACTION_ALARM_TRIGGERED -> {
                 val alarmId = intent.getStringExtra("alarmId")
@@ -97,10 +100,12 @@ class GeofencingService : Service() {
         val serviceChannel = NotificationChannel(
             "geofencing_service",
             "Location Tracking Service",
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Shows when the app is tracking your location"
-            setShowBadge(false)
+            setShowBadge(true)
+            enableLights(false)
+            enableVibration(false)
         }
         
         // Live cards channel
@@ -111,10 +116,26 @@ class GeofencingService : Service() {
         ).apply {
             description = "Shows distance to your destinations"
             setShowBadge(true)
+            enableLights(false)
+            enableVibration(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+        
+        // Alarm triggers channel (used by GeofenceReceiver)
+        val alarmTriggersChannel = NotificationChannel(
+            "alarm_triggers",
+            "Alarm Triggers",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Alert notifications when you approach destinations"
+            setShowBadge(true)
+            enableVibration(true)
+            enableLights(true)
         }
         
         notificationManager.createNotificationChannel(serviceChannel)
         notificationManager.createNotificationChannel(liveCardChannel)
+        notificationManager.createNotificationChannel(alarmTriggersChannel)
     }
 
     private fun setupLocationCallback() {
@@ -128,8 +149,8 @@ class GeofencingService : Service() {
         }
     }
 
-    private fun startLiveCardTracking() {
-        Log.d(TAG, "Starting live card tracking")
+    private fun startLiveCardTracking(alarmData: ArrayList<Map<String, Any>>?) {
+        Log.d(TAG, "Starting live card tracking with ${alarmData?.size ?: 0} alarms")
         
         // Create foreground notification
         val notification = createForegroundNotification()
@@ -139,8 +160,8 @@ class GeofencingService : Service() {
             startForeground(FOREGROUND_ID, notification)
         }
         
-        // Load active alarms from shared preferences or database
-        loadActiveAlarms()
+        // Load active alarms from Flutter
+        loadActiveAlarms(alarmData)
         
         // Start location updates
         startLocationUpdates()
@@ -182,13 +203,31 @@ class GeofencingService : Service() {
         Log.d(TAG, "Location updates stopped")
     }
 
-    private fun loadActiveAlarms() {
-        // In a real implementation, load from SharedPreferences or database
-        // For demo, we'll use mock data
+    private fun loadActiveAlarms(alarmData: ArrayList<Map<String, Any>>?) {
         serviceScope.launch {
-            // This would load active alarms from the Flutter app's data
-            // For now, we'll just log that we're loading
-            Log.d(TAG, "Loading active alarms from storage")
+            try {
+                activeAlarms.clear()
+                alarmData?.forEach { alarmMap ->
+                    val id = alarmMap["id"] as? String ?: return@forEach
+                    val label = alarmMap["label"] as? String ?: "Unknown"
+                    val latitude = alarmMap["latitude"] as? Double ?: return@forEach
+                    val longitude = alarmMap["longitude"] as? Double ?: return@forEach
+                    val radius = alarmMap["radius"] as? Double ?: 300.0
+                    
+                    val alarm = AlarmData(
+                        id = id,
+                        label = label,
+                        latitude = latitude,
+                        longitude = longitude,
+                        radius = radius
+                    )
+                    activeAlarms[id] = alarm
+                    Log.d(TAG, "Loaded alarm: $label at ($latitude, $longitude) radius: ${radius}m")
+                }
+                Log.d(TAG, "Loaded ${activeAlarms.size} active alarms")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading active alarms", e)
+            }
         }
     }
 
@@ -227,6 +266,8 @@ class GeofencingService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(createSnoozeAction(alarmData.id))
             .addAction(createHideAction(alarmData.id))
             .addAction(createStopAction(alarmData.id))
@@ -274,6 +315,9 @@ class GeofencingService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
 
