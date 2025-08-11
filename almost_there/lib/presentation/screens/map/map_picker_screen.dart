@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../../../data/models/location_model.dart';
 import '../../providers/location_provider.dart';
@@ -136,7 +137,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black.withValues(alpha: 0.3),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -249,14 +250,74 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     ref.read(currentLocationProvider.notifier).refreshLocation();
   }
 
-  void _performSearch(String query) {
-    // In a real implementation, this would use a geocoding service
-    // For now, we'll just show a message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('การค้นหาสถานที่จะพร้อมใช้งานเร็วๆ นี้'),
-      ),
-    );
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) return;
+    
+    try {
+      // Show loading indicator
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('กำลังค้นหา...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Perform geocoding
+      List<Location> locations = await locationFromAddress(query);
+      
+      if (!mounted) return;
+      
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+        final newLocation = LatLng(location.latitude, location.longitude);
+        
+        setState(() {
+          _selectedLocation = newLocation;
+        });
+        
+        // Move map to the found location
+        _mapController.move(newLocation, 16.0);
+        
+        // Clear the search field
+        _searchController.clear();
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('พบสถานที่แล้ว!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Show not found message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ไม่พบสถานที่ที่ค้นหา กรุณาลองใหม่'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการค้นหา: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _confirmLocation() {
