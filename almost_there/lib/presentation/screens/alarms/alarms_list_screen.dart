@@ -85,6 +85,14 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
                   ),
                 ),
                 const PopupMenuItem(
+                  value: 'test_alarm_current_location',
+                  child: ListTile(
+                    leading: Icon(Icons.my_location),
+                    title: Text('สร้างปลุกตรงตำแหน่งที่อยู่'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'check_permissions',
                   child: ListTile(
                     leading: Icon(Icons.security),
@@ -326,6 +334,9 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
       case 'test_alarm':
         _createTestAlarm();
         break;
+      case 'test_alarm_current_location':
+        _createTestAlarmAtCurrentLocation();
+        break;
       case 'check_permissions':
         _checkPermissions();
         break;
@@ -452,6 +463,29 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('สร้างปลุกทดสอบเรียบร้อย! ลองเดินไปที่กรุงเทพฯ'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _createTestAlarmAtCurrentLocation() async {
+    try {
+      await ref.read(alarmsProvider.notifier).createTestAlarmAtCurrentLocation();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('สร้างปลุกทดสอบตรงตำแหน่งที่อยู่เรียบร้อย! ลองออกจากตำแหน่งนี้'),
             duration: Duration(seconds: 3),
           ),
         );

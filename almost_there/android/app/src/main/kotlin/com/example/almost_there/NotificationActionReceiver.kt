@@ -32,6 +32,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
     private fun handleSnoozeAlarm(context: Context, alarmId: String, minutes: Int) {
         Log.d(TAG, "Snoozing alarm $alarmId for $minutes minutes")
         
+        // Stop vibration immediately
+        stopVibration(context)
+        
         // Dismiss current notification
         val notificationManager = NotificationManagerCompat.from(context)
         val notificationId = NOTIFICATION_ID_BASE + alarmId.hashCode()
@@ -54,6 +57,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
     private fun handleDismissAlarm(context: Context, alarmId: String) {
         Log.d(TAG, "Dismissing alarm: $alarmId")
         
+        // Stop vibration immediately
+        stopVibration(context)
+        
         // Dismiss current notification
         val notificationManager = NotificationManagerCompat.from(context)
         val notificationId = NOTIFICATION_ID_BASE + alarmId.hashCode()
@@ -74,5 +80,15 @@ class NotificationActionReceiver : BroadcastReceiver() {
         context.startForegroundService(serviceIntent)
         
         Log.d(TAG, "Alarm $alarmId dismissed")
+    }
+
+    private fun stopVibration(context: Context) {
+        try {
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            vibrator?.cancel()
+            Log.d(TAG, "Vibration stopped")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not stop vibration: ${e.message}")
+        }
     }
 }

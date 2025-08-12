@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -11,6 +12,9 @@ import 'data/models/settings_model.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/alarms/alarms_list_screen.dart';
 import 'presentation/screens/onboarding/permissions_screen.dart';
+
+// Global navigation key for handling deep links
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,11 +53,58 @@ Future<void> main() async {
     },
   );
 
+  // Setup method channel for MainActivity communication
+  _setupMainActivityChannel();
+
   runApp(
     const ProviderScope(
       child: AlmostThereApp(),
     ),
   );
+}
+
+void _setupMainActivityChannel() {
+  const channel = MethodChannel('com.example.almost_there/main');
+  
+  channel.setMethodCallHandler((call) async {
+    switch (call.method) {
+      case 'onAlarmEvent':
+        final eventType = call.arguments['eventType'] as String;
+        final alarmId = call.arguments['alarmId'] as String;
+        print('📱 [DEBUG] Received alarm event: $eventType for alarm: $alarmId');
+        
+        // Handle different alarm events
+        switch (eventType) {
+          case 'ALARM_FULL_SCREEN':
+          case 'OPEN_ALARM_MAP':
+            // Navigate to home and trigger alarm display
+            _handleAlarmEvent(alarmId);
+            break;
+        }
+        break;
+      default:
+        print('📱 [DEBUG] Unknown method: ${call.method}');
+    }
+  });
+}
+
+void _handleAlarmEvent(String alarmId) {
+  print('📱 [DEBUG] Handling alarm event for: $alarmId');
+  
+  // Get the current context and navigate to home screen
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    // If we're not on the home screen, navigate there
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    
+    // Show a snackbar to indicate the alarm was triggered
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('เปิดแอปจากการแจ้งเตือนปลุก: $alarmId'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 }
 
 class AlmostThereApp extends StatelessWidget {
@@ -63,6 +114,7 @@ class AlmostThereApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Almost There!',
+      navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,

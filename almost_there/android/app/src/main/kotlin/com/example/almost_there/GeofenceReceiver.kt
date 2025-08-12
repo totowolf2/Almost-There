@@ -114,7 +114,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                 // ตั้งค่าเสียงและการสั่นแบบนาฬิกาปลุก
                 .setDefaults(0) // ไม่ใช้ default เพื่อกำหนดเอง
                 .setSound(android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI) // เสียงปลุก
-                .setVibrate(longArrayOf(0, 1000, 500, 1000, 500, 1000, 500, 1000)) // สั่นต่อเนื่อง
+                .setVibrate(longArrayOf(0, 1000, 300, 1000, 300, 1000)) // สั่นสั้นๆ
                 .setLights(0xFFFF0000.toInt(), 1000, 500) // ไฟกระพริบแดง
                 
                 // Full screen notification สำหรับหน้าจอล็อก
@@ -152,17 +152,17 @@ class GeofenceReceiver : BroadcastReceiver() {
                 notificationManager.notify(notificationId, notification)
                 Log.d(TAG, "🚨 ALARM TRIGGER notification shown for alarm: $alarmId")
                 
-                // เพิ่มการสั่นเสริมผ่าน Vibrator (สำหรับอุปกรณ์ที่รองรับ)
+                // เพิ่มการสั่นเสริมผ่าน Vibrator (แต่ไม่วนรูป)
                 try {
                     val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
                     if (vibrator?.hasVibrator() == true) {
-                        // สั่นแบบ pattern: pause, vibrate, pause, vibrate...
-                        val vibratePattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+                        // สั่นแบบ pattern แต่ไม่วนรูป (เสียงจาก notification จะทำหน้าที่เตือนต่อเนื่อง)
+                        val vibratePattern = longArrayOf(0, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000)
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            vibrator.vibrate(android.os.VibrationEffect.createWaveform(vibratePattern, 0)) // repeat
+                            vibrator.vibrate(android.os.VibrationEffect.createWaveform(vibratePattern, -1)) // ไม่ repeat
                         } else {
                             @Suppress("DEPRECATION")
-                            vibrator.vibrate(vibratePattern, 0) // repeat
+                            vibrator.vibrate(vibratePattern, -1) // ไม่ repeat
                         }
                     }
                 } catch (e: Exception) {

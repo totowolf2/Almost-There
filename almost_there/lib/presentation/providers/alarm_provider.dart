@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/models/alarm_model.dart';
 import '../../data/models/location_model.dart';
+import '../../data/services/location_service.dart';
 import '../../platform/geofencing_platform.dart';
 
 const _uuid = Uuid();
@@ -311,6 +312,58 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       print('🧪 [DEBUG] createTestAlarm completed successfully');
     } catch (e) {
       print('🧪 [ERROR] createTestAlarm failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> createTestAlarmAtCurrentLocation() async {
+    print('🧪 [DEBUG] Starting createTestAlarmAtCurrentLocation...');
+    
+    try {
+      // Get current location
+      print('📍 [DEBUG] Getting current location...');
+      final locationService = LocationService();
+      final position = await locationService.getCurrentPosition();
+      
+      if (position == null) {
+        throw Exception('ไม่สามารถหาตำแหน่งปัจจุบันได้');
+      }
+      
+      print('📍 [DEBUG] Current position: ${position.latitude}, ${position.longitude}');
+      
+      // Create test alarm at current location
+      print('🧪 [DEBUG] Adding test alarm at current location...');
+      await addAlarm(
+        label: 'ทดสอบแจ้งเตือนตรงนี้',
+        type: AlarmType.oneTime,
+        location: LocationModel(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          address: 'ตำแหน่งปัจจุบัน',
+        ),
+        radius: 50.0, // Very small radius for immediate testing
+        enabled: true,
+        showLiveCard: true,
+      );
+      
+      // For one-time alarms, they're automatically activated in addAlarm
+      final testAlarm = state.last; // Get the just-added alarm
+      print('🧪 [DEBUG] Test alarm created: enabled=${testAlarm.enabled}, isActive=${testAlarm.isActive}, type=${testAlarm.type}');
+      
+      // Register geofences after adding test alarm
+      print('🧪 [DEBUG] Registering geofences...');
+      await registerActiveGeofences();
+      print('🧪 [DEBUG] Geofences registered');
+      
+      // Start live tracking
+      print('🧪 [DEBUG] Starting live card tracking...');
+      final trackingResult = await startLiveCardTracking();
+      print('🧪 [DEBUG] Live tracking result: $trackingResult');
+      
+      print('🧪 [DEBUG] Test alarm at current location created successfully!');
+    } catch (e, stackTrace) {
+      print('❌ [ERROR] Failed to create test alarm at current location: $e');
+      print('❌ [STACKTRACE] $stackTrace');
       rethrow;
     }
   }
