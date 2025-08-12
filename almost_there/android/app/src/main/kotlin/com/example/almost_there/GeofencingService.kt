@@ -134,16 +134,27 @@ class GeofencingService : Service() {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         
-        // Alarm triggers channel (used by GeofenceReceiver)
+        // Alarm triggers channel (used by GeofenceReceiver) - แบบนาฬิกาปลุก
         val alarmTriggersChannel = NotificationChannel(
             "alarm_triggers",
             "Alarm Triggers",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Alert notifications when you approach destinations"
+            description = "Alarm-style notifications when you reach destinations"
             setShowBadge(true)
             enableVibration(true)
+            vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000) // สั่นแบบปลุก
             enableLights(true)
+            lightColor = 0xFFFF0000.toInt() // แสงแดง
+            setSound(
+                android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI,
+                android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC // แสดงบน lock screen
+            setBypassDnd(true) // ข้าม Do Not Disturb mode
         }
         
         notificationManager.createNotificationChannel(serviceChannel)

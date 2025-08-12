@@ -88,30 +88,60 @@ class GeofenceReceiver : BroadcastReceiver() {
 
     private fun showTriggerNotification(context: Context, alarmId: String) {
         try {
-            // Create notification for alarm trigger
+            // Create full-screen intent สำหรับแสดงหน้าปลุกเต็มจอ
+            val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
+                action = "ALARM_FULL_SCREEN"
+                putExtra("alarmId", alarmId)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val fullScreenPendingIntent = android.app.PendingIntent.getActivity(
+                context,
+                alarmId.hashCode() + 100,
+                fullScreenIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+            )
+
+            // สร้าง notification แบบนาฬิกาปลุก - เสียงดัง ต่อเนื่อง
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("ถึงใกล้ปลายทางแล้ว!")
-                .setContentText("คุณใกล้ถึงจุดหมายของ $alarmId แล้ว")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setContentTitle("⏰ ถึงปลายทางแล้ว! ⏰")
+                .setContentText("🚨 คุณใกล้ถึงจุดหมายแล้ว! 🚨")
+                .setPriority(NotificationCompat.PRIORITY_MAX) // สูงสุด
+                .setCategory(NotificationCompat.CATEGORY_ALARM) // ประเภทปลุก
+                .setAutoCancel(false) // ไม่หายเมื่อแตะ
+                .setOngoing(true) // ไม่สามารถปัดทิ้งได้
+                
+                // ตั้งค่าเสียงและการสั่นแบบนาฬิกาปลุก
+                .setDefaults(0) // ไม่ใช้ default เพื่อกำหนดเอง
+                .setSound(android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI) // เสียงปลุก
+                .setVibrate(longArrayOf(0, 1000, 500, 1000, 500, 1000, 500, 1000)) // สั่นต่อเนื่อง
+                .setLights(0xFFFF0000.toInt(), 1000, 500) // ไฟกระพริบแดง
+                
+                // Full screen notification สำหรับหน้าจอล็อก
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // แสดงบนหน้าจอล็อก
+                
+                // Actions แบบนาฬิกาปลุก
                 .addAction(
                     R.mipmap.ic_launcher,
-                    "Snooze 5m",
+                    "⏰ Snooze 5 นาที",
                     createSnoozeIntent(context, alarmId, 5)
                 )
                 .addAction(
                     R.mipmap.ic_launcher,
-                    "Dismiss",
+                    "✅ ปิดเตือน",
                     createDismissIntent(context, alarmId)
                 )
                 .addAction(
                     R.mipmap.ic_launcher,
-                    "Open Map",
+                    "🗺️ ดูแผนที่",
                     createOpenMapIntent(context, alarmId)
                 )
+                
+                // Style แบบ big text เพื่อแสดงข้อความเต็ม
+                .setStyle(NotificationCompat.BigTextStyle()
+                    .bigText("🚨 คุณมาถึงจุดหมายแล้ว! 🚨\n\nแตะเพื่อปิดการแจ้งเตือน หรือเลื่อนเตือนอีก 5 นาที")
+                    .setBigContentTitle("⏰ Almost There - ถึงปลายทางแล้ว! ⏰"))
                 .build()
 
             val notificationManager = NotificationManagerCompat.from(context)
@@ -120,12 +150,30 @@ class GeofenceReceiver : BroadcastReceiver() {
             // Check notification permission (Android 13+)
             if (notificationManager.areNotificationsEnabled()) {
                 notificationManager.notify(notificationId, notification)
-                Log.d(TAG, "Trigger notification shown for alarm: $alarmId")
+                Log.d(TAG, "🚨 ALARM TRIGGER notification shown for alarm: $alarmId")
+                
+                // เพิ่มการสั่นเสริมผ่าน Vibrator (สำหรับอุปกรณ์ที่รองรับ)
+                try {
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                    if (vibrator?.hasVibrator() == true) {
+                        // สั่นแบบ pattern: pause, vibrate, pause, vibrate...
+                        val vibratePattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            vibrator.vibrate(android.os.VibrationEffect.createWaveform(vibratePattern, 0)) // repeat
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(vibratePattern, 0) // repeat
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not trigger vibration: ${e.message}")
+                }
+                
             } else {
-                Log.w(TAG, "Notification permission not granted")
+                Log.w(TAG, "Notification permission not granted - alarm might not be heard!")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error showing trigger notification", e)
+            Log.e(TAG, "Error showing ALARM trigger notification", e)
         }
     }
 
