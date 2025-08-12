@@ -421,15 +421,16 @@ class GeofencingService : Service() {
     }
 
     private fun createStopAction(alarmId: String): NotificationCompat.Action {
-        val intent = Intent(this, GeofencingService::class.java).apply {
-            action = ACTION_ALARM_DISMISSED
+        // Use NotificationActionReceiver for consistent dismiss behavior like main alarm notifications
+        val intent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = "DISMISS_ALARM"
             putExtra("alarmId", alarmId)
         }
-        val pendingIntent = PendingIntent.getService(
+        val pendingIntent = PendingIntent.getBroadcast(
             this, alarmId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-        return NotificationCompat.Action(R.mipmap.ic_launcher, "Stop", pendingIntent)
+        return NotificationCompat.Action(R.mipmap.ic_launcher, "✅ ปิดเตือน", pendingIntent)
     }
 
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

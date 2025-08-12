@@ -120,6 +120,20 @@ class GeofenceReceiver : BroadcastReceiver() {
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
             )
 
+            // Create content intent for tapping the notification body
+            val dismissIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+                action = "DISMISS_ALARM"
+                putExtra("alarmId", alarmId)
+                putExtra("source", "notification_tap") // เพื่อระบุว่ามาจากการแตะการ์ด
+            }
+            val contentPendingIntent = android.app.PendingIntent.getBroadcast(
+                context,
+                alarmId.hashCode() + 10,
+                dismissIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+            )
+            Log.d(TAG, "Created content intent for notification tap with alarm: $alarmId")
+
             // สร้าง notification แบบนาฬิกาปลุก - เสียงดัง ต่อเนื่อง
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
@@ -127,8 +141,9 @@ class GeofenceReceiver : BroadcastReceiver() {
                 .setContentText("🚨 คุณใกล้ถึงจุดหมายแล้ว! 🚨")
                 .setPriority(NotificationCompat.PRIORITY_MAX) // สูงสุด
                 .setCategory(NotificationCompat.CATEGORY_ALARM) // ประเภทปลุก
-                .setAutoCancel(false) // ไม่หายเมื่อแตะ
-                .setOngoing(true) // ไม่สามารถปัดทิ้งได้
+                .setAutoCancel(true) // หายเมื่อแตะ
+                .setOngoing(false) // สามารถปัดทิ้งได้
+                .setContentIntent(contentPendingIntent) // แตะเพื่อปิดเตือน
                 
                 // Audio/vibration handled by AlarmAudioService
                 .setDefaults(0) // No default sounds/vibrations
@@ -136,7 +151,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                 .setLights(0xFFFF0000.toInt(), 1000, 500) // Red blinking lights
                 
                 // Full screen notification สำหรับหน้าจอล็อก
-                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setFullScreenIntent(fullScreenPendingIntent, false) // Set to false to allow content intent
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // แสดงบนหน้าจอล็อก
                 
                 // Actions แบบนาฬิกาปลุก
@@ -168,7 +183,7 @@ class GeofenceReceiver : BroadcastReceiver() {
             // Check notification permission (Android 13+)
             if (notificationManager.areNotificationsEnabled()) {
                 notificationManager.notify(notificationId, notification)
-                Log.d(TAG, "🚨 ALARM TRIGGER notification shown for alarm: $alarmId")
+                Log.d(TAG, "🚨 ALARM TRIGGER notification shown with ID: $notificationId for alarm: $alarmId")
             } else {
                 Log.w(TAG, "Notification permission not granted - alarm might not be heard!")
             }

@@ -258,8 +258,13 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
         .where((alarm) => alarm.shouldTriggerToday() && alarm.showLiveCard)
         .toList();
 
+    print('📱 [DEBUG] startLiveCardTracking: Found ${liveCardAlarms.length} live card alarms');
+
     if (liveCardAlarms.isEmpty) {
-      return true; // No alarms to track
+      print('📱 [DEBUG] No live card alarms found, stopping service');
+      // Ensure service is stopped when no alarms to track
+      await stopLiveCardTracking();
+      return true;
     }
 
     final alarmData = liveCardAlarms

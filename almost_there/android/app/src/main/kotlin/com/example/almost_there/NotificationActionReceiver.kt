@@ -1,5 +1,6 @@
 package com.example.almost_there
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -18,8 +19,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         val alarmId = intent.getStringExtra("alarmId") ?: return
+        val source = intent.getStringExtra("source") ?: "unknown"
         
-        Log.d(TAG, "Notification action received: $action for alarm: $alarmId")
+        Log.d(TAG, "Notification action received: $action for alarm: $alarmId, source: $source")
         
         when (action) {
             "SNOOZE_ALARM" -> {
@@ -41,10 +43,28 @@ class NotificationActionReceiver : BroadcastReceiver() {
         // Stop vibration immediately
         stopVibration(context)
         
-        // Dismiss current notification
+        // Dismiss current notifications - try multiple approaches
         val notificationManager = NotificationManagerCompat.from(context)
+        val systemNotificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notificationId = NOTIFICATION_ID_BASE + alarmId.hashCode()
+        
+        // Try both compat and system notification managers
         notificationManager.cancel(notificationId)
+        systemNotificationManager.cancel(notificationId)
+        Log.d(TAG, "Cancelled main alarm notification with ID: $notificationId for alarm: $alarmId")
+        
+        // Also cancel AlarmAudioService foreground notification
+        notificationManager.cancel(4000) // FOREGROUND_ID from AlarmAudioService
+        systemNotificationManager.cancel(4000)
+        Log.d(TAG, "Cancelled AlarmAudioService foreground notification (ID: 4000)")
+        
+        // Clear all notifications for this app as last resort
+        try {
+            notificationManager.cancelAll()
+            Log.d(TAG, "Cleared all notifications as safety measure")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not clear all notifications: ${e.message}")
+        }
         
         // Send snooze event to Flutter app
         val broadcastIntent = Intent("com.example.almost_there.ALARM_SNOOZED").apply {
@@ -72,10 +92,28 @@ class NotificationActionReceiver : BroadcastReceiver() {
         // Stop vibration immediately
         stopVibration(context)
         
-        // Dismiss current notification
+        // Dismiss current notifications - try multiple approaches
         val notificationManager = NotificationManagerCompat.from(context)
+        val systemNotificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notificationId = NOTIFICATION_ID_BASE + alarmId.hashCode()
+        
+        // Try both compat and system notification managers
         notificationManager.cancel(notificationId)
+        systemNotificationManager.cancel(notificationId)
+        Log.d(TAG, "Cancelled main alarm notification with ID: $notificationId for alarm: $alarmId")
+        
+        // Also cancel AlarmAudioService foreground notification
+        notificationManager.cancel(4000) // FOREGROUND_ID from AlarmAudioService
+        systemNotificationManager.cancel(4000)
+        Log.d(TAG, "Cancelled AlarmAudioService foreground notification (ID: 4000)")
+        
+        // Clear all notifications for this app as last resort
+        try {
+            notificationManager.cancelAll()
+            Log.d(TAG, "Cleared all notifications as safety measure")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not clear all notifications: ${e.message}")
+        }
         
         // Send dismiss event to Flutter app
         val broadcastIntent = Intent("com.example.almost_there.ALARM_DISMISSED").apply {
@@ -109,11 +147,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     private fun stopAlarmAudioService(context: Context) {
         try {
+            // First send the stop action to properly clean up
             val audioServiceIntent = Intent(context, AlarmAudioService::class.java).apply {
                 action = AlarmAudioService.ACTION_STOP_ALARM
             }
             context.startService(audioServiceIntent)
-            Log.d(TAG, "Alarm audio service stop requested")
+            
+            // Also try to stop the service directly to ensure cleanup
+            val stopServiceIntent = Intent(context, AlarmAudioService::class.java)
+            context.stopService(stopServiceIntent)
+            
+            Log.d(TAG, "Alarm audio service stop requested and service stop called")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping alarm audio service", e)
         }

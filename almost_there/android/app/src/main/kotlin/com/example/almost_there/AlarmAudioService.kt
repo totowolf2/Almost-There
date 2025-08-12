@@ -136,9 +136,15 @@ class AlarmAudioService : Service() {
         // Release audio focus
         releaseAudioFocus()
         
+        // Cancel the foreground notification explicitly
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(FOREGROUND_ID)
+        
         // Stop foreground service
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+        
+        Log.d(TAG, "Alarm service stopped and notification cleared")
     }
 
     private fun requestAudioFocus(): Boolean {

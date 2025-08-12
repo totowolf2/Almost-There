@@ -68,6 +68,7 @@ class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             "hasNotificationPermission" -> hasNotificationPermission(result)
             "startLiveCardService" -> startLiveCardService(call, result)
             "stopLiveCardService" -> stopLiveCardService(result)
+            "stopAlarmAudio" -> stopAlarmAudio(call, result)
             else -> result.notImplemented()
         }
     }
@@ -230,6 +231,36 @@ class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping live card service", e)
             result.error("SERVICE_ERROR", "Failed to stop live card service: ${e.message}", null)
+        }
+    }
+    
+    private fun stopAlarmAudio(call: MethodCall, result: Result) {
+        try {
+            val alarmId = call.argument<String>("alarmId") ?: ""
+            Log.d(TAG, "Stopping alarm audio for: $alarmId")
+            
+            // First send the stop action to properly clean up
+            val stopAudioIntent = Intent(context, AlarmAudioService::class.java).apply {
+                action = AlarmAudioService.ACTION_STOP_ALARM
+            }
+            context.startService(stopAudioIntent)
+            
+            // Also try to stop the service directly to ensure cleanup
+            val stopServiceIntent = Intent(context, AlarmAudioService::class.java)
+            context.stopService(stopServiceIntent)
+            
+            // Cancel alarm notification using same ID calculation as GeofenceReceiver
+            val notificationManager = NotificationManagerCompat.from(context)
+            val NOTIFICATION_ID_BASE = 1000
+            val notificationId = NOTIFICATION_ID_BASE + alarmId.hashCode()
+            notificationManager.cancel(notificationId)
+            Log.d(TAG, "Cancelled notification with ID: $notificationId for alarm: $alarmId")
+            
+            Log.d(TAG, "Successfully stopped alarm audio and canceled notification for: $alarmId")
+            result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping alarm audio", e)
+            result.error("ALARM_AUDIO_ERROR", "Failed to stop alarm audio: ${e.message}", null)
         }
     }
 

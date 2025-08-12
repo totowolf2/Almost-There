@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -292,10 +293,20 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
         print('🔄 [DEBUG] Alarm disabled, updating geofences...');
         await alarmNotifier.registerActiveGeofences();
         
-        // Update live card tracking (may stop if no active alarms)
-        print('🔄 [DEBUG] Updating live card tracking...');
+        // Stop any active alarm notifications and audio for this alarm
+        print('🔄 [DEBUG] Stopping any active alarm notifications and audio...');
+        await _stopAlarmNotificationAndAudio(alarmId);
+        
+        // Stop live card service completely and restart with remaining active alarms
+        print('🔄 [DEBUG] Stopping existing live card service...');
+        await alarmNotifier.stopLiveCardTracking();
+        
+        print('🔄 [DEBUG] Restarting live card tracking with remaining active alarms...');
         final trackingResult = await alarmNotifier.startLiveCardTracking();
         print('🔄 [DEBUG] Live tracking result: $trackingResult');
+        
+        // Also manually trigger UI sync if needed - the LiveCard should disappear  
+        print('🔄 [DEBUG] LiveCard tracking updated for disabled alarm');
       }
     } catch (e) {
       print('🔄 [ERROR] Failed to toggle alarm: $e');
@@ -567,5 +578,23 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _stopAlarmNotificationAndAudio(String alarmId) async {
+    try {
+      print('🛑 [DEBUG] Stopping alarm notification and audio for: $alarmId');
+      
+      // Send platform channel message to Android to stop alarm notification and audio
+      const platform = MethodChannel('com.example.almost_there/geofencing');
+      await platform.invokeMethod('stopAlarmAudio', {'alarmId': alarmId});
+      
+      // Also update alarm state in Flutter  
+      final alarmNotifier = ref.read(alarmsProvider.notifier);
+      await alarmNotifier.triggerAlarm(alarmId); // This disables one-time alarms
+      
+      print('🛑 [DEBUG] Alarm $alarmId notification and audio stopped');
+    } catch (e) {
+      print('🛑 [ERROR] Failed to stop alarm notification: $e');
+    }
   }
 }
