@@ -18,8 +18,20 @@ class GeofenceReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "Geofence event received")
+        val action = intent.action
+        Log.d(TAG, "Geofence event received with action: $action")
         
+        // Handle snooze re-trigger
+        if (action == "SNOOZE_RETRIGGER") {
+            val alarmId = intent.getStringExtra("alarmId")
+            if (alarmId != null) {
+                Log.d(TAG, "Handling snooze re-trigger for alarm: $alarmId")
+                handleGeofenceEnter(context, alarmId)
+            }
+            return
+        }
+        
+        // Handle normal geofencing events
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
         if (geofencingEvent == null) {
             Log.e(TAG, "GeofencingEvent is null")
@@ -60,6 +72,13 @@ class GeofenceReceiver : BroadcastReceiver() {
         // Send trigger event to Flutter app through method channel
         sendTriggerToFlutter(context, alarmId)
         
+        // Start alarm audio service for continuous sound
+        val audioServiceIntent = Intent(context, AlarmAudioService::class.java).apply {
+            action = AlarmAudioService.ACTION_START_ALARM
+            putExtra("alarmId", alarmId)
+        }
+        context.startForegroundService(audioServiceIntent)
+        
         // Show immediate notification
         showTriggerNotification(context, alarmId)
         
@@ -88,8 +107,8 @@ class GeofenceReceiver : BroadcastReceiver() {
 
     private fun showTriggerNotification(context: Context, alarmId: String) {
         try {
-            // Create full-screen intent สำหรับแสดงหน้าปลุกเต็มจอ
-            val fullScreenIntent = Intent(context, MainActivity::class.java).apply {
+            // Create full-screen intent for dedicated alarm activity
+            val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
                 action = "ALARM_FULL_SCREEN"
                 putExtra("alarmId", alarmId)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -111,11 +130,10 @@ class GeofenceReceiver : BroadcastReceiver() {
                 .setAutoCancel(false) // ไม่หายเมื่อแตะ
                 .setOngoing(true) // ไม่สามารถปัดทิ้งได้
                 
-                // ตั้งค่าเสียงและการสั่นแบบนาฬิกาปลุก
-                .setDefaults(0) // ไม่ใช้ default เพื่อกำหนดเอง
-                .setSound(android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI) // เสียงปลุก
-                .setVibrate(longArrayOf(0, 1000, 300, 1000, 300, 1000)) // สั่นสั้นๆ
-                .setLights(0xFFFF0000.toInt(), 1000, 500) // ไฟกระพริบแดง
+                // Audio/vibration handled by AlarmAudioService
+                .setDefaults(0) // No default sounds/vibrations
+                .setSilent(true) // Silent notification - audio handled by service
+                .setLights(0xFFFF0000.toInt(), 1000, 500) // Red blinking lights
                 
                 // Full screen notification สำหรับหน้าจอล็อก
                 .setFullScreenIntent(fullScreenPendingIntent, true)
@@ -151,24 +169,6 @@ class GeofenceReceiver : BroadcastReceiver() {
             if (notificationManager.areNotificationsEnabled()) {
                 notificationManager.notify(notificationId, notification)
                 Log.d(TAG, "🚨 ALARM TRIGGER notification shown for alarm: $alarmId")
-                
-                // เพิ่มการสั่นเสริมผ่าน Vibrator (แต่ไม่วนรูป)
-                try {
-                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
-                    if (vibrator?.hasVibrator() == true) {
-                        // สั่นแบบ pattern แต่ไม่วนรูป (เสียงจาก notification จะทำหน้าที่เตือนต่อเนื่อง)
-                        val vibratePattern = longArrayOf(0, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000)
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            vibrator.vibrate(android.os.VibrationEffect.createWaveform(vibratePattern, -1)) // ไม่ repeat
-                        } else {
-                            @Suppress("DEPRECATION")
-                            vibrator.vibrate(vibratePattern, -1) // ไม่ repeat
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not trigger vibration: ${e.message}")
-                }
-                
             } else {
                 Log.w(TAG, "Notification permission not granted - alarm might not be heard!")
             }

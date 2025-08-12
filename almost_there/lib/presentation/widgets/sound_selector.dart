@@ -21,13 +21,10 @@ class _SoundSelectorState extends State<SoundSelector> {
   String? _currentlyPlaying;
   
   final List<SoundOption> _sounds = [
-    SoundOption('default', 'เสียงเริ่มต้น', Icons.volume_up),
-    SoundOption('bell', 'เสียงระฆัง', Icons.notifications),
-    SoundOption('chime', 'เสียงกิ่ง', Icons.music_note),
-    SoundOption('ding', 'เสียงดิง', Icons.campaign),
-    SoundOption('gentle', 'เสียงนุ่มนวล', Icons.volume_down),
-    SoundOption('alert', 'เสียงเตือน', Icons.warning),
-    SoundOption('custom', 'เสียงกำหนดเอง', Icons.folder_open),
+    SoundOption('alarm', 'เสียงปลุกเริ่มต้น', Icons.alarm),
+    SoundOption('notification', 'เสียงแจ้งเตือน', Icons.notifications),
+    SoundOption('ringtone', 'เสียงเรียกเข้า', Icons.phone_in_talk),
+    SoundOption('system_alert', 'เสียงเตือนระบบ', Icons.warning),
   ];
 
   @override
@@ -191,54 +188,47 @@ class _SoundSelectorState extends State<SoundSelector> {
   }
 
   Future<void> _playSpecificSound(String soundKey) async {
-    // แทนที่จะใช้ notification ให้เล่นเสียงโดยตรงผ่าน SystemSound patterns
+    // เล่นเสียงตัวอย่างโดยใช้เสียงจริงของระบบ
     switch (soundKey) {
-      case 'bell':
-        // เสียงระฆัง - click เดียว
-        SystemSound.play(SystemSoundType.click);
-        HapticFeedback.lightImpact();
-        break;
-        
-      case 'chime':
-        // เสียงกิ่ง - click 2 ครั้ง
-        SystemSound.play(SystemSoundType.click);
-        await Future.delayed(const Duration(milliseconds: 300));
-        SystemSound.play(SystemSoundType.click);
-        HapticFeedback.lightImpact();
-        break;
-        
-      case 'ding':
-        // เสียงดิง - alert sound
+      case 'alarm':
+        // เสียงปลุกเริ่มต้น - ใช้ระบบปลุกหลัก
         SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 300));
         HapticFeedback.mediumImpact();
         break;
         
-      case 'gentle':
-        // เสียงนุ่มนวล - click เบา
-        SystemSound.play(SystemSoundType.click);
+      case 'notification':
+        // เสียงแจ้งเตือนปกติ
+        SystemSound.play(SystemSoundType.alert);
         HapticFeedback.lightImpact();
         break;
         
-      case 'alert':
-        // เสียงเตือน - alert + vibration pattern
-        SystemSound.play(SystemSoundType.alert);
-        HapticFeedback.heavyImpact();
-        // เพิ่มการสั่นซ้ำ
-        Future.delayed(const Duration(milliseconds: 500), () {
-          HapticFeedback.heavyImpact();
-        });
+      case 'ringtone':
+        // เสียงเรียกเข้า - simulation ด้วย click pattern
+        SystemSound.play(SystemSoundType.click);
+        await Future.delayed(const Duration(milliseconds: 200));
+        SystemSound.play(SystemSoundType.click);
+        await Future.delayed(const Duration(milliseconds: 200));
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.mediumImpact();
         break;
         
-      default: // 'default'
-        // เสียงเริ่มต้น - alert standard
+      case 'system_alert':
+        // เสียงเตือนระบบที่เข้มข้น
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 500));
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        break;
+        
+      default:
+        // เสียงปลุกเริ่มต้น
         SystemSound.play(SystemSoundType.alert);
         HapticFeedback.mediumImpact();
         break;
     }
-    
-    // สำหรับในอนาคต: หากมีไฟล์เสียงจริง สามารถใช้ได้:
-    // await _audioPlayer.setAsset('assets/sounds/${soundKey}.mp3');
-    // await _audioPlayer.play();
   }
 
   void _selectCustomSound() {

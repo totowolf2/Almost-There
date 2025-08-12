@@ -67,7 +67,7 @@ class AlarmModel extends HiveObject {
     this.radius = 300.0,
     this.enabled = true,
     this.showLiveCard = true,
-    this.soundPath = 'default',
+    this.soundPath = 'alarm',
     this.snoozeMinutes = 5,
     this.recurringDays = const [],
     required this.createdAt,

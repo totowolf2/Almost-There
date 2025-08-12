@@ -32,6 +32,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
     private fun handleSnoozeAlarm(context: Context, alarmId: String, minutes: Int) {
         Log.d(TAG, "Snoozing alarm $alarmId for $minutes minutes")
         
+        // Stop alarm audio service immediately
+        stopAlarmAudioService(context)
+        
         // Stop vibration immediately
         stopVibration(context)
         
@@ -48,14 +51,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
         context.sendBroadcast(broadcastIntent)
         
-        // Schedule re-trigger after snooze period
-        // This would typically reschedule the geofence or set an alarm
-        // For now, we'll just log it
+        // Schedule re-trigger with a smaller geofence for snooze functionality
+        scheduleSnoozeAlarm(context, alarmId, minutes)
+        
         Log.d(TAG, "Alarm $alarmId snoozed for $minutes minutes")
     }
 
     private fun handleDismissAlarm(context: Context, alarmId: String) {
         Log.d(TAG, "Dismissing alarm: $alarmId")
+        
+        // Stop alarm audio service immediately
+        stopAlarmAudioService(context)
         
         // Stop vibration immediately
         stopVibration(context)
@@ -89,6 +95,65 @@ class NotificationActionReceiver : BroadcastReceiver() {
             Log.d(TAG, "Vibration stopped")
         } catch (e: Exception) {
             Log.w(TAG, "Could not stop vibration: ${e.message}")
+        }
+    }
+
+    private fun stopAlarmAudioService(context: Context) {
+        try {
+            val audioServiceIntent = Intent(context, AlarmAudioService::class.java).apply {
+                action = AlarmAudioService.ACTION_STOP_ALARM
+            }
+            context.startService(audioServiceIntent)
+            Log.d(TAG, "Alarm audio service stop requested")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping alarm audio service", e)
+        }
+    }
+
+    private fun scheduleSnoozeAlarm(context: Context, alarmId: String, minutes: Int) {
+        try {
+            // Create a scheduled re-trigger using AlarmManager
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val triggerTime = System.currentTimeMillis() + (minutes * 60 * 1000)
+            
+            // Create intent for snooze re-trigger
+            val snoozeIntent = Intent(context, GeofenceReceiver::class.java).apply {
+                action = "SNOOZE_RETRIGGER"
+                putExtra("alarmId", alarmId)
+            }
+            
+            val pendingIntent = android.app.PendingIntent.getBroadcast(
+                context,
+                alarmId.hashCode() + 500, // Unique ID for snooze
+                snoozeIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+            )
+            
+            // Schedule the alarm with exact timing for reliability
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                alarmManager.setExact(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                alarmManager.set(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            }
+            
+            Log.d(TAG, "Snooze alarm scheduled for $minutes minutes")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling snooze alarm", e)
         }
     }
 }
