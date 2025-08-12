@@ -94,6 +94,14 @@ void _setupMainActivityChannel() {
             // Handle alarm trigger
             _handleAlarmTriggered(alarmId);
             break;
+          case 'LIVECARD_STOPPED':
+            // Handle LiveCard stop button
+            _handleLiveCardStopped(alarmId);
+            break;
+          case 'LIVECARD_HIDDEN':
+            // Handle LiveCard hide button
+            _handleLiveCardHidden(alarmId);
+            break;
         }
         break;
       default:
@@ -191,6 +199,73 @@ void _handleAlarmTriggered(String alarmId) {
         content: Text('⏰ ปลุกถูกเรียกแล้ว!'),
         duration: Duration(seconds: 2),
         backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+void _handleLiveCardStopped(String alarmId) {
+  print('📱 [DEBUG] Handling LiveCard stopped for: $alarmId');
+  
+  try {
+    // Get the provider container to update alarm state
+    final container = ProviderScope.containerOf(navigatorKey.currentContext!);
+    final alarmNotifier = container.read(alarmsProvider.notifier);
+    
+    // Find and update the alarm to disable it (same as alarm dismiss for immediate UI update)
+    final alarms = container.read(alarmsProvider);
+    final alarmIndex = alarms.indexWhere((a) => a.id == alarmId);
+    
+    if (alarmIndex == -1) {
+      print('📱 [WARNING] Alarm $alarmId not found in current state - may have been already processed');
+      return; // Exit gracefully if alarm not found
+    }
+    
+    final alarm = alarms[alarmIndex];
+    
+    print('📱 [DEBUG] Found alarm: ${alarm.label}, current enabled: ${alarm.enabled}');
+    
+    // Update alarm state immediately - disable the alarm for immediate UI response  
+    final updatedAlarm = alarm.copyWith(enabled: false);
+    print('📱 [DEBUG] Updating alarm to disabled state...');
+    
+    alarmNotifier.updateAlarm(updatedAlarm).then((_) {
+      print('📱 [DEBUG] Alarm $alarmId disabled from LiveCard stop - UI should be updated now');
+      
+      // Update geofences to reflect disabled state
+      alarmNotifier.registerActiveGeofences();
+    }).catchError((error) {
+      print('📱 [ERROR] Failed to handle LiveCard stop: $error');
+    });
+    
+    // Show user feedback
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔕 ปิด LiveCard และปลุกแล้ว'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  } catch (e, stackTrace) {
+    print('📱 [ERROR] Exception in _handleLiveCardStopped: $e');
+    print('📱 [ERROR] Stack trace: $stackTrace');
+  }
+}
+
+void _handleLiveCardHidden(String alarmId) {
+  print('📱 [DEBUG] Handling LiveCard hidden for: $alarmId');
+  
+  // Show user feedback
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('👁️‍🗨️ ซ่อน LiveCard วันนี้แล้ว'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.grey,
       ),
     );
   }

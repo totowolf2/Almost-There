@@ -87,12 +87,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         // Also send to Flutter via method channel
         sendEventToFlutter(context, "ALARM_DISMISSED", alarmId, null)
         
-        // Stop the foreground service if no more active alarms
+        // Send dismiss action to service (use regular startService since we're not starting foreground)
         val serviceIntent = Intent(context, GeofencingService::class.java).apply {
             action = GeofencingService.ACTION_ALARM_DISMISSED
             putExtra("alarmId", alarmId)
         }
-        context.startForegroundService(serviceIntent)
+        context.startService(serviceIntent)
         
         Log.d(TAG, "Alarm $alarmId dismissed")
     }

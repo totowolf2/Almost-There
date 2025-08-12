@@ -331,11 +331,18 @@ class GeofencingService : Service() {
 
     private fun handleAlarmDismissed(alarmId: String) {
         Log.d(TAG, "Alarm dismissed: $alarmId")
+        
+        // Send event to Flutter FIRST, before any cleanup
+        Log.d(TAG, "Sending LIVECARD_STOPPED event to Flutter...")
+        sendEventToFlutter("LIVECARD_STOPPED", alarmId)
+        
+        // Then clean up
         activeAlarms.remove(alarmId)
         clearLiveCard(alarmId)
         
         // Stop service if no more active alarms
         if (activeAlarms.isEmpty()) {
+            Log.d(TAG, "No more active alarms, stopping service")
             stopLiveCardTracking()
         }
     }
@@ -349,6 +356,9 @@ class GeofencingService : Service() {
         // Remove from active tracking for today only
         activeAlarms.remove(alarmId)
         clearLiveCard(alarmId)
+        
+        // Send event to Flutter for immediate UI update
+        sendEventToFlutter("LIVECARD_HIDDEN", alarmId)
         
         // Note: For recurring alarms, this only hides for today
         // The alarm remains enabled and will show again tomorrow
@@ -486,5 +496,22 @@ class GeofencingService : Service() {
             }
         }
         editor.apply()
+    }
+
+    private fun sendEventToFlutter(eventType: String, alarmId: String) {
+        try {
+            Log.d(TAG, "Creating intent to send $eventType event to Flutter...")
+            val mainActivityIntent = Intent(this, MainActivity::class.java).apply {
+                action = "SEND_FLUTTER_EVENT"
+                putExtra("eventType", eventType)
+                putExtra("alarmId", alarmId)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            Log.d(TAG, "Starting activity with intent...")
+            startActivity(mainActivityIntent)
+            Log.d(TAG, "Successfully sent $eventType event to Flutter for alarm: $alarmId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send $eventType event to Flutter for alarm: $alarmId", e)
+        }
     }
 }

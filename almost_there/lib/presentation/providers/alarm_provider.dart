@@ -15,7 +15,9 @@ final alarmRepositoryProvider = Provider<AlarmRepository>((ref) {
 });
 
 // Alarms list provider - watches the Hive box
-final alarmsProvider = StateNotifierProvider<AlarmsNotifier, List<AlarmModel>>((ref) {
+final alarmsProvider = StateNotifierProvider<AlarmsNotifier, List<AlarmModel>>((
+  ref,
+) {
   final repository = ref.watch(alarmRepositoryProvider);
   return AlarmsNotifier(repository);
 });
@@ -56,7 +58,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     String? groupName,
   }) async {
     print('📝 [DEBUG] Adding alarm: $label, type: $type, enabled: $enabled');
-    
+
     final alarm = AlarmModel(
       id: _uuid.v4(),
       label: label,
@@ -71,60 +73,100 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       createdAt: DateTime.now(),
       groupName: groupName,
       // Set expiration for one-time alarms (24 hours)
-      expiresAt: type == AlarmType.oneTime 
+      expiresAt: type == AlarmType.oneTime
           ? DateTime.now().add(const Duration(hours: 24))
           : null,
       // For one-time alarms that are enabled, automatically set isActive = true
       isActive: type == AlarmType.oneTime && enabled,
     );
 
-    print('📝 [DEBUG] Created alarm with isActive: ${alarm.isActive}, shouldTrigger: ${alarm.shouldTriggerToday()}');
-    
+    print(
+      '📝 [DEBUG] Created alarm with isActive: ${alarm.isActive}, shouldTrigger: ${alarm.shouldTriggerToday()}',
+    );
+
     await _repository.saveAlarm(alarm);
     _loadAlarms();
-    
+
     print('📝 [DEBUG] Alarm saved and loaded. Total alarms: ${state.length}');
   }
 
   Future<void> updateAlarm(AlarmModel alarm) async {
-    print('📝 [DEBUG] updateAlarm called for alarm: ${alarm.label}, enabled: ${alarm.enabled}');
-    
+    print(
+      '📝 [DEBUG] updateAlarm called for alarm: ${alarm.label}, enabled: ${alarm.enabled}',
+    );
+
     // Update the state immediately for UI responsiveness
     final index = state.indexWhere((a) => a.id == alarm.id);
     if (index != -1) {
       final updatedList = [...state];
       updatedList[index] = alarm;
       state = updatedList;
-      print('📝 [DEBUG] State updated immediately, alarm enabled: ${state[index].enabled}');
+      print(
+        '📝 [DEBUG] State updated immediately, alarm enabled: ${state[index].enabled}',
+      );
     } else {
       print('📝 [ERROR] Could not find alarm with id: ${alarm.id}');
     }
-    
+
     // Then save to database
     await _repository.saveAlarm(alarm);
     print('📝 [DEBUG] Alarm saved to database');
-    
+
     // Reload from database to ensure consistency
     _loadAlarms();
     print('📝 [DEBUG] Alarms reloaded from database');
   }
 
   Future<void> deleteAlarm(String alarmId) async {
+    print('📝 [DEBUG] deleteAlarm called for alarm: $alarmId');
+
+    // Update state immediately for UI responsiveness - remove from list
+    final index = state.indexWhere((a) => a.id == alarmId);
+    if (index != -1) {
+      final updatedList = [...state];
+      updatedList.removeAt(index);
+      state = updatedList;
+      print('📝 [DEBUG] Alarm removed from state immediately');
+    } else {
+      print('📝 [ERROR] Could not find alarm with id: $alarmId');
+    }
+
+    // Then delete from database
     await _repository.deleteAlarm(alarmId);
+    print('📝 [DEBUG] Alarm deleted from database');
+
+    // Reload from database to ensure consistency
     _loadAlarms();
+    print('📝 [DEBUG] Alarms reloaded from database');
   }
 
   Future<void> deleteAlarms(List<String> alarmIds) async {
+    print('📝 [DEBUG] deleteAlarms called for ${alarmIds.length} alarms');
+
+    // Update state immediately for UI responsiveness - remove all selected alarms
+    final updatedList = state
+        .where((alarm) => !alarmIds.contains(alarm.id))
+        .toList();
+    state = updatedList;
+    print(
+      '📝 [DEBUG] ${alarmIds.length} alarms removed from state immediately',
+    );
+
+    // Then delete from database
     for (final id in alarmIds) {
       await _repository.deleteAlarm(id);
     }
+    print('📝 [DEBUG] ${alarmIds.length} alarms deleted from database');
+
+    // Reload from database to ensure consistency
     _loadAlarms();
+    print('📝 [DEBUG] Alarms reloaded from database');
   }
 
   Future<void> toggleAlarm(String alarmId) async {
     final alarm = state.firstWhere((a) => a.id == alarmId);
     final updatedAlarm = alarm.copyWith(enabled: !alarm.enabled);
-    
+
     // Update UI immediately
     final index = state.indexWhere((a) => a.id == alarmId);
     if (index != -1) {
@@ -132,7 +174,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       updatedList[index] = updatedAlarm;
       state = updatedList;
     }
-    
+
     // Save to database
     await _repository.saveAlarm(updatedAlarm);
     _loadAlarms();
@@ -157,27 +199,19 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   Future<void> activateOneTimeAlarm(String alarmId) async {
     final alarm = state.firstWhere((a) => a.id == alarmId);
     if (alarm.type == AlarmType.oneTime) {
-      await updateAlarm(alarm.copyWith(
-        isActive: true,
-        enabled: true,
-      ));
+      await updateAlarm(alarm.copyWith(isActive: true, enabled: true));
     }
   }
 
   Future<void> triggerAlarm(String alarmId) async {
     final alarm = state.firstWhere((a) => a.id == alarmId);
-    
+
     // Update last triggered time
-    var updatedAlarm = alarm.copyWith(
-      lastTriggeredAt: DateTime.now(),
-    );
+    var updatedAlarm = alarm.copyWith(lastTriggeredAt: DateTime.now());
 
     // For one-time alarms, disable after triggering
     if (alarm.type == AlarmType.oneTime) {
-      updatedAlarm = updatedAlarm.copyWith(
-        enabled: false,
-        isActive: false,
-      );
+      updatedAlarm = updatedAlarm.copyWith(enabled: false, isActive: false);
     }
 
     await updateAlarm(updatedAlarm);
@@ -198,7 +232,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       recurringDays: original.recurringDays,
       createdAt: DateTime.now(),
       groupName: original.groupName,
-      expiresAt: original.type == AlarmType.oneTime 
+      expiresAt: original.type == AlarmType.oneTime
           ? DateTime.now().add(const Duration(hours: 24))
           : null,
     );
@@ -223,18 +257,22 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     final liveCardAlarms = state
         .where((alarm) => alarm.shouldTriggerToday() && alarm.showLiveCard)
         .toList();
-    
+
     if (liveCardAlarms.isEmpty) {
       return true; // No alarms to track
     }
 
-    final alarmData = liveCardAlarms.map((alarm) => {
-      'id': alarm.id,
-      'label': alarm.label,
-      'latitude': alarm.location.latitude,
-      'longitude': alarm.location.longitude,
-      'radius': alarm.radius,
-    }).toList();
+    final alarmData = liveCardAlarms
+        .map(
+          (alarm) => {
+            'id': alarm.id,
+            'label': alarm.label,
+            'latitude': alarm.location.latitude,
+            'longitude': alarm.location.longitude,
+            'radius': alarm.radius,
+          },
+        )
+        .toList();
 
     return await GeofencingPlatform.startLiveCardService(alarmData);
   }
@@ -246,25 +284,35 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
 
   // Register geofences for active alarms
   Future<void> registerActiveGeofences() async {
-    final activeAlarms = state.where((alarm) => alarm.shouldTriggerToday()).toList();
-    print('🎯 [DEBUG] registerActiveGeofences: Found ${activeAlarms.length} active alarms');
-    
+    final activeAlarms = state
+        .where((alarm) => alarm.shouldTriggerToday())
+        .toList();
+    print(
+      '🎯 [DEBUG] registerActiveGeofences: Found ${activeAlarms.length} active alarms',
+    );
+
     // Debug: Show details of all alarms
     for (final alarm in state) {
-      print('🎯 [DEBUG] Alarm "${alarm.label}": enabled=${alarm.enabled}, isActive=${alarm.isActive}, type=${alarm.type}, shouldTrigger=${alarm.shouldTriggerToday()}');
+      print(
+        '🎯 [DEBUG] Alarm "${alarm.label}": enabled=${alarm.enabled}, isActive=${alarm.isActive}, type=${alarm.type}, shouldTrigger=${alarm.shouldTriggerToday()}',
+      );
       if (alarm.type == AlarmType.recurring) {
         final today = DateTime.now().weekday % 7;
-        print('🎯 [DEBUG] Recurring alarm "${alarm.label}": today=$today, recurringDays=${alarm.recurringDays}');
+        print(
+          '🎯 [DEBUG] Recurring alarm "${alarm.label}": today=$today, recurringDays=${alarm.recurringDays}',
+        );
       }
       if (alarm.type == AlarmType.oneTime) {
-        print('🎯 [DEBUG] OneTime alarm "${alarm.label}": isExpired=${alarm.isExpired}, expiresAt=${alarm.expiresAt}');
+        print(
+          '🎯 [DEBUG] OneTime alarm "${alarm.label}": isExpired=${alarm.isExpired}, expiresAt=${alarm.expiresAt}',
+        );
       }
     }
-    
+
     // First remove all existing geofences
     print('🎯 [DEBUG] Removing all existing geofences...');
     await GeofencingPlatform.removeAllGeofences();
-    
+
     // Register new geofences for active alarms
     for (final alarm in activeAlarms) {
       print('🎯 [DEBUG] Registering geofence for alarm: ${alarm.label}');
@@ -273,15 +321,19 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
         latitude: alarm.location.latitude,
         longitude: alarm.location.longitude,
         radius: alarm.radius,
-        expirationDuration: alarm.type == AlarmType.oneTime 
+        expirationDuration: alarm.type == AlarmType.oneTime
             ? 86400000 // 24 hours in milliseconds
             : null, // Never expire for recurring alarms
       );
-      
+
       if (!success) {
-        print('🎯 [ERROR] Failed to register geofence for alarm: ${alarm.label}');
+        print(
+          '🎯 [ERROR] Failed to register geofence for alarm: ${alarm.label}',
+        );
       } else {
-        print('🎯 [DEBUG] Successfully registered geofence for alarm: ${alarm.label}');
+        print(
+          '🎯 [DEBUG] Successfully registered geofence for alarm: ${alarm.label}',
+        );
       }
     }
   }
@@ -289,9 +341,11 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   // Check permissions and setup notifications
   Future<Map<String, bool>> checkPermissions() async {
     final hasLocation = await GeofencingPlatform.hasLocationPermission();
-    final hasBackground = await GeofencingPlatform.hasBackgroundLocationPermission();
-    final hasNotification = await GeofencingPlatform.hasNotificationPermission();
-    
+    final hasBackground =
+        await GeofencingPlatform.hasBackgroundLocationPermission();
+    final hasNotification =
+        await GeofencingPlatform.hasNotificationPermission();
+
     return {
       'location': hasLocation,
       'background': hasBackground,
@@ -302,7 +356,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   // Test function to create a test alarm for debugging
   Future<void> createTestAlarm() async {
     print('🧪 [DEBUG] Starting createTestAlarm...');
-    
+
     try {
       print('🧪 [DEBUG] Adding test alarm...');
       await addAlarm(
@@ -317,27 +371,31 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
         enabled: true,
         showLiveCard: true,
       );
-      
+
       // For one-time alarms, need to activate them manually
       final testAlarm = state.last; // Get the just-added alarm
-      print('🧪 [DEBUG] Test alarm before activation: enabled=${testAlarm.enabled}, isActive=${testAlarm.isActive}, type=${testAlarm.type}');
+      print(
+        '🧪 [DEBUG] Test alarm before activation: enabled=${testAlarm.enabled}, isActive=${testAlarm.isActive}, type=${testAlarm.type}',
+      );
       await updateAlarm(testAlarm.copyWith(isActive: true));
-      
+
       // Check the alarm again after update
       final updatedAlarm = state.firstWhere((a) => a.id == testAlarm.id);
-      print('🧪 [DEBUG] Test alarm after activation: enabled=${updatedAlarm.enabled}, isActive=${updatedAlarm.isActive}, shouldTrigger=${updatedAlarm.shouldTriggerToday()}');
+      print(
+        '🧪 [DEBUG] Test alarm after activation: enabled=${updatedAlarm.enabled}, isActive=${updatedAlarm.isActive}, shouldTrigger=${updatedAlarm.shouldTriggerToday()}',
+      );
       print('🧪 [DEBUG] Test alarm added successfully');
-      
+
       // Register geofences after adding test alarm
       print('🧪 [DEBUG] Registering geofences...');
       await registerActiveGeofences();
       print('🧪 [DEBUG] Geofences registered');
-      
+
       // Start live tracking
       print('🧪 [DEBUG] Starting live card tracking...');
       final result = await startLiveCardTracking();
       print('🧪 [DEBUG] Live card tracking result: $result');
-      
+
       print('🧪 [DEBUG] createTestAlarm completed successfully');
     } catch (e) {
       print('🧪 [ERROR] createTestAlarm failed: $e');
@@ -347,19 +405,21 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
 
   Future<void> createTestAlarmAtCurrentLocation() async {
     print('🧪 [DEBUG] Starting createTestAlarmAtCurrentLocation...');
-    
+
     try {
       // Get current location
       print('📍 [DEBUG] Getting current location...');
       final locationService = LocationService();
       final position = await locationService.getCurrentPosition();
-      
+
       if (position == null) {
         throw Exception('ไม่สามารถหาตำแหน่งปัจจุบันได้');
       }
-      
-      print('📍 [DEBUG] Current position: ${position.latitude}, ${position.longitude}');
-      
+
+      print(
+        '📍 [DEBUG] Current position: ${position.latitude}, ${position.longitude}',
+      );
+
       // Create test alarm at current location
       print('🧪 [DEBUG] Adding test alarm at current location...');
       await addAlarm(
@@ -370,25 +430,27 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
           longitude: position.longitude,
           address: 'ตำแหน่งปัจจุบัน',
         ),
-        radius: 50.0, // Very small radius for immediate testing
+        radius: 300.0, // Very small radius for immediate testing
         enabled: true,
         showLiveCard: true,
       );
-      
+
       // For one-time alarms, they're automatically activated in addAlarm
       final testAlarm = state.last; // Get the just-added alarm
-      print('🧪 [DEBUG] Test alarm created: enabled=${testAlarm.enabled}, isActive=${testAlarm.isActive}, type=${testAlarm.type}');
-      
+      print(
+        '🧪 [DEBUG] Test alarm created: enabled=${testAlarm.enabled}, isActive=${testAlarm.isActive}, type=${testAlarm.type}',
+      );
+
       // Register geofences after adding test alarm
       print('🧪 [DEBUG] Registering geofences...');
       await registerActiveGeofences();
       print('🧪 [DEBUG] Geofences registered');
-      
+
       // Start live tracking
       print('🧪 [DEBUG] Starting live card tracking...');
       final trackingResult = await startLiveCardTracking();
       print('🧪 [DEBUG] Live tracking result: $trackingResult');
-      
+
       print('🧪 [DEBUG] Test alarm at current location created successfully!');
     } catch (e, stackTrace) {
       print('❌ [ERROR] Failed to create test alarm at current location: $e');

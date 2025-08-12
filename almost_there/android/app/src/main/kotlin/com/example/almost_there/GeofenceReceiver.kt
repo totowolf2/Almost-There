@@ -82,12 +82,12 @@ class GeofenceReceiver : BroadcastReceiver() {
         // Show immediate notification
         showTriggerNotification(context, alarmId)
         
-        // Start/update the foreground service for live distance tracking
+        // Send alarm triggered action to service (use regular startService since we're just notifying)
         val serviceIntent = Intent(context, GeofencingService::class.java).apply {
             action = GeofencingService.ACTION_ALARM_TRIGGERED
             putExtra("alarmId", alarmId)
         }
-        context.startForegroundService(serviceIntent)
+        context.startService(serviceIntent)
     }
 
     private fun sendTriggerToFlutter(context: Context, alarmId: String) {

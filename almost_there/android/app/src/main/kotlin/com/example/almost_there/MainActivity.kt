@@ -56,8 +56,8 @@ class MainActivity : FlutterActivity() {
                 sendAlarmEventToFlutter("OPEN_ALARM_MAP", alarmId)
             }
             "SEND_FLUTTER_EVENT" -> {
-                Log.d(TAG, "Sending Flutter event")
                 val eventType = intent.getStringExtra("eventType")
+                Log.d(TAG, "Received SEND_FLUTTER_EVENT: $eventType for alarm: $alarmId")
                 val snoozeMinutes = intent.getIntExtra("snoozeMinutes", 0)
                 sendAlarmEventToFlutter(eventType ?: "", alarmId, if (snoozeMinutes > 0) snoozeMinutes else null)
             }
