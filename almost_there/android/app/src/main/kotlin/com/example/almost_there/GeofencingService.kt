@@ -1,4 +1,4 @@
-package com.example.almost_there
+package com.vaas.almost_there
 
 import android.Manifest
 import android.app.*

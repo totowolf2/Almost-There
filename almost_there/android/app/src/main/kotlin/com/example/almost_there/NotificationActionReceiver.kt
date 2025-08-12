@@ -1,4 +1,4 @@
-package com.example.almost_there
+package com.vaas.almost_there
 
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
@@ -67,7 +67,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
         
         // Send snooze event to Flutter app
-        val broadcastIntent = Intent("com.example.almost_there.ALARM_SNOOZED").apply {
+        val broadcastIntent = Intent("com.vaas.almost_there.ALARM_SNOOZED").apply {
             putExtra("alarmId", alarmId)
             putExtra("snoozeMinutes", minutes)
             putExtra("timestamp", System.currentTimeMillis())
@@ -116,7 +116,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
         
         // Send dismiss event to Flutter app
-        val broadcastIntent = Intent("com.example.almost_there.ALARM_DISMISSED").apply {
+        val broadcastIntent = Intent("com.vaas.almost_there.ALARM_DISMISSED").apply {
             putExtra("alarmId", alarmId)
             putExtra("timestamp", System.currentTimeMillis())
         }

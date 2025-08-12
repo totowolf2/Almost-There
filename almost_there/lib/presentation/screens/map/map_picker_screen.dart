@@ -34,7 +34,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     super.initState();
     _mapController = MapController();
     _selectedRadius = widget.initialRadius;
-    
+
     // Set initial location or use Bangkok as default
     if (widget.initialLocation != null) {
       _selectedLocation = LatLng(
@@ -55,7 +55,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final colorExtension = Theme.of(context).extension<AppColorExtension>()!;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('เลือกตำแหน่ง'),
@@ -82,7 +82,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
               onSubmitted: _performSearch,
             ),
           ),
-          
+
           // Map
           Expanded(
             child: FlutterMap(
@@ -102,10 +102,10 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                 // OSM Tile Layer
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.almost_there',
+                  userAgentPackageName: 'com.vaas.almost_there',
                   maxZoom: 19,
                 ),
-                
+
                 // Geofence circle
                 CircleLayer(
                   circles: [
@@ -119,7 +119,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                     ),
                   ],
                 ),
-                
+
                 // Center marker
                 MarkerLayer(
                   markers: [
@@ -131,10 +131,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 3,
-                          ),
+                          border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.3),
@@ -155,7 +152,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
               ],
             ),
           ),
-          
+
           // Radius slider
           Container(
             padding: const EdgeInsets.all(16),
@@ -176,12 +173,14 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Location info
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -205,7 +204,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
               ],
             ),
           ),
-          
+
           // Action buttons
           Padding(
             padding: const EdgeInsets.all(16),
@@ -234,7 +233,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
   void _goToCurrentLocation() async {
     final currentLocationAsync = ref.read(currentLocationProvider);
-    
+
     currentLocationAsync.whenOrNull(
       data: (location) {
         if (location != null) {
@@ -252,7 +251,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
-    
+
     try {
       // Show loading indicator
       if (!mounted) return;
@@ -275,23 +274,23 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
       // Perform geocoding
       List<Location> locations = await locationFromAddress(query);
-      
+
       if (!mounted) return;
-      
+
       if (locations.isNotEmpty) {
         final location = locations.first;
         final newLocation = LatLng(location.latitude, location.longitude);
-        
+
         setState(() {
           _selectedLocation = newLocation;
         });
-        
+
         // Move map to the found location
         _mapController.move(newLocation, 16.0);
-        
+
         // Clear the search field
         _searchController.clear();
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -326,10 +325,9 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
       longitude: _selectedLocation.longitude,
     );
 
-    Navigator.of(context).pop({
-      'location': selectedLocationModel,
-      'radius': _selectedRadius,
-    });
+    Navigator.of(
+      context,
+    ).pop({'location': selectedLocationModel, 'radius': _selectedRadius});
   }
 
   String _formatRadius(double radius) {

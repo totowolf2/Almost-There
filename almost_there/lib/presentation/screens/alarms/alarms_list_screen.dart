@@ -32,10 +32,10 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
     final locationStatus = await Permission.locationWhenInUse.status;
     final backgroundLocationStatus = await Permission.locationAlways.status;
     final notificationStatus = await Permission.notification.status;
-    
+
     // If any essential permission is missing, navigate to permissions screen
-    if (!locationStatus.isGranted || 
-        !backgroundLocationStatus.isGranted || 
+    if (!locationStatus.isGranted ||
+        !backgroundLocationStatus.isGranted ||
         !notificationStatus.isGranted) {
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/permissions');
@@ -107,8 +107,7 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
       ),
       body: Column(
         children: [
-          if (_isMultiSelectMode)
-            _buildMultiSelectToolbar(context),
+          if (_isMultiSelectMode) _buildMultiSelectToolbar(context),
           Expanded(
             child: alarms.isEmpty
                 ? _buildEmptyState(context)
@@ -118,7 +117,7 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
                     itemBuilder: (context, index) {
                       final alarm = alarms[index];
                       final isSelected = _selectedAlarmIds.contains(alarm.id);
-                      
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: AlarmItemWidget(
@@ -127,8 +126,10 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
                           isMultiSelectMode: _isMultiSelectMode,
                           onTap: () => _handleAlarmTap(alarm.id),
                           onLongPress: () => _handleAlarmLongPress(alarm.id),
-                          onToggle: (enabled) => _toggleAlarm(alarm.id, enabled),
-                          onSelect: (selected) => _selectAlarm(alarm.id, selected),
+                          onToggle: (enabled) =>
+                              _toggleAlarm(alarm.id, enabled),
+                          onSelect: (selected) =>
+                              _selectAlarm(alarm.id, selected),
                         ),
                       );
                     },
@@ -183,7 +184,7 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
 
   Widget _buildMultiSelectToolbar(BuildContext context) {
     final selectedCount = _selectedAlarmIds.length;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -263,10 +264,10 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
 
   Future<void> _toggleAlarm(String alarmId, bool enabled) async {
     print('🔄 [DEBUG] Toggle alarm: $alarmId to enabled: $enabled');
-    
+
     try {
       final alarmNotifier = ref.read(alarmsProvider.notifier);
-      
+
       // Update the alarm's enabled state immediately for UI responsiveness
       final alarm = ref.read(alarmsProvider).firstWhere((a) => a.id == alarmId);
       final updatedAlarm = alarm.copyWith(
@@ -274,17 +275,17 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
         // For one-time alarms, set isActive = enabled
         isActive: alarm.type == AlarmType.oneTime ? enabled : alarm.isActive,
       );
-      
+
       // Update alarm in database - this should trigger UI update immediately
       await alarmNotifier.updateAlarm(updatedAlarm);
-      
+
       print('🔄 [DEBUG] Alarm state updated in database');
-      
+
       // If we're enabling the alarm, register geofences and start tracking
       if (enabled) {
         print('🔄 [DEBUG] Alarm enabled, registering geofences...');
         await alarmNotifier.registerActiveGeofences();
-        
+
         print('🔄 [DEBUG] Starting live card tracking...');
         final trackingResult = await alarmNotifier.startLiveCardTracking();
         print('🔄 [DEBUG] Live tracking result: $trackingResult');
@@ -292,20 +293,24 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
         // If we're disabling the alarm, we should re-register geofences to exclude this one
         print('🔄 [DEBUG] Alarm disabled, updating geofences...');
         await alarmNotifier.registerActiveGeofences();
-        
+
         // Stop any active alarm notifications and audio for this alarm
-        print('🔄 [DEBUG] Stopping any active alarm notifications and audio...');
+        print(
+          '🔄 [DEBUG] Stopping any active alarm notifications and audio...',
+        );
         await _stopAlarmNotificationAndAudio(alarmId);
-        
+
         // Stop live card service completely and restart with remaining active alarms
         print('🔄 [DEBUG] Stopping existing live card service...');
         await alarmNotifier.stopLiveCardTracking();
-        
-        print('🔄 [DEBUG] Restarting live card tracking with remaining active alarms...');
+
+        print(
+          '🔄 [DEBUG] Restarting live card tracking with remaining active alarms...',
+        );
         final trackingResult = await alarmNotifier.startLiveCardTracking();
         print('🔄 [DEBUG] Live tracking result: $trackingResult');
-        
-        // Also manually trigger UI sync if needed - the LiveCard should disappear  
+
+        // Also manually trigger UI sync if needed - the LiveCard should disappear
         print('🔄 [DEBUG] LiveCard tracking updated for disabled alarm');
       }
     } catch (e) {
@@ -322,19 +327,15 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
   }
 
   void _addNewAlarm() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AddEditAlarmScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const AddEditAlarmScreen()));
   }
 
   void _editAlarm(String alarmId) {
     final alarm = ref.read(alarmsProvider).firstWhere((a) => a.id == alarmId);
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AddEditAlarmScreen(alarm: alarm),
-      ),
+      MaterialPageRoute(builder: (context) => AddEditAlarmScreen(alarm: alarm)),
     );
   }
 
@@ -360,38 +361,38 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
 
   void _openSettings() {
     // TODO: Navigate to settings screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Settings - Coming Soon')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Settings - Coming Soon')));
   }
 
   void _cleanupExpiredAlarms() {
     ref.read(alarmsProvider.notifier).cleanupExpiredAlarms();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Expired alarms cleaned up')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Expired alarms cleaned up')));
   }
 
   void _addToGroup() {
     // TODO: Show group selection dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Add to Group - Coming Soon')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Add to Group - Coming Soon')));
   }
 
   Future<void> _enableSelectedAlarms() async {
     try {
       final alarmNotifier = ref.read(alarmsProvider.notifier);
       await alarmNotifier.enableAlarms(_selectedAlarmIds.toList());
-      
+
       // Register geofences and start tracking for newly enabled alarms
       print('🔄 [DEBUG] Multiple alarms enabled, updating geofences...');
       await alarmNotifier.registerActiveGeofences();
-      
+
       print('🔄 [DEBUG] Starting live card tracking...');
       final trackingResult = await alarmNotifier.startLiveCardTracking();
       print('🔄 [DEBUG] Live tracking result: $trackingResult');
-      
+
       _exitMultiSelectMode();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -415,20 +416,22 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
     try {
       final alarmNotifier = ref.read(alarmsProvider.notifier);
       await alarmNotifier.disableAlarms(_selectedAlarmIds.toList());
-      
+
       // Update geofences to exclude disabled alarms
       print('🔄 [DEBUG] Multiple alarms disabled, updating geofences...');
       await alarmNotifier.registerActiveGeofences();
-      
+
       // Update live card tracking (may stop if no active alarms left)
       print('🔄 [DEBUG] Updating live card tracking...');
       final trackingResult = await alarmNotifier.startLiveCardTracking();
       print('🔄 [DEBUG] Live tracking result: $trackingResult');
-      
+
       _exitMultiSelectMode();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${_selectedAlarmIds.length} alarms disabled')),
+          SnackBar(
+            content: Text('${_selectedAlarmIds.length} alarms disabled'),
+          ),
         );
       }
     } catch (e) {
@@ -449,7 +452,9 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Alarms'),
-        content: Text('Are you sure you want to delete ${_selectedAlarmIds.length} alarm(s)?'),
+        content: Text(
+          'Are you sure you want to delete ${_selectedAlarmIds.length} alarm(s)?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -457,11 +462,15 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              ref.read(alarmsProvider.notifier).deleteAlarms(_selectedAlarmIds.toList());
+              ref
+                  .read(alarmsProvider.notifier)
+                  .deleteAlarms(_selectedAlarmIds.toList());
               Navigator.of(context).pop();
               _exitMultiSelectMode();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${_selectedAlarmIds.length} alarms deleted')),
+                SnackBar(
+                  content: Text('${_selectedAlarmIds.length} alarms deleted'),
+                ),
               );
             },
             child: const Text('Delete'),
@@ -496,11 +505,15 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
 
   Future<void> _createTestAlarmAtCurrentLocation() async {
     try {
-      await ref.read(alarmsProvider.notifier).createTestAlarmAtCurrentLocation();
+      await ref
+          .read(alarmsProvider.notifier)
+          .createTestAlarmAtCurrentLocation();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('สร้างปลุกทดสอบตรงตำแหน่งที่อยู่เรียบร้อย! ลองออกจากตำแหน่งนี้'),
+            content: Text(
+              'สร้างปลุกทดสอบตรงตำแหน่งที่อยู่เรียบร้อย! ลองออกจากตำแหน่งนี้',
+            ),
             duration: Duration(seconds: 3),
           ),
         );
@@ -519,8 +532,10 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
 
   Future<void> _checkPermissions() async {
     try {
-      final permissions = await ref.read(alarmsProvider.notifier).checkPermissions();
-      
+      final permissions = await ref
+          .read(alarmsProvider.notifier)
+          .checkPermissions();
+
       if (mounted) {
         showDialog(
           context: context,
@@ -530,9 +545,18 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildPermissionRow('Location', permissions['location'] ?? false),
-                _buildPermissionRow('Background Location', permissions['background'] ?? false),
-                _buildPermissionRow('Notifications', permissions['notification'] ?? false),
+                _buildPermissionRow(
+                  'Location',
+                  permissions['location'] ?? false,
+                ),
+                _buildPermissionRow(
+                  'Background Location',
+                  permissions['background'] ?? false,
+                ),
+                _buildPermissionRow(
+                  'Notifications',
+                  permissions['notification'] ?? false,
+                ),
               ],
             ),
             actions: [
@@ -583,15 +607,17 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
   Future<void> _stopAlarmNotificationAndAudio(String alarmId) async {
     try {
       print('🛑 [DEBUG] Stopping alarm notification and audio for: $alarmId');
-      
+
       // Send platform channel message to Android to stop alarm notification and audio
-      const platform = MethodChannel('com.example.almost_there/geofencing');
+      const platform = MethodChannel('com.vaas.almost_there/geofencing');
       await platform.invokeMethod('stopAlarmAudio', {'alarmId': alarmId});
-      
-      // Also update alarm state in Flutter  
+
+      // Also update alarm state in Flutter
       final alarmNotifier = ref.read(alarmsProvider.notifier);
-      await alarmNotifier.triggerAlarm(alarmId); // This disables one-time alarms
-      
+      await alarmNotifier.triggerAlarm(
+        alarmId,
+      ); // This disables one-time alarms
+
       print('🛑 [DEBUG] Alarm $alarmId notification and audio stopped');
     } catch (e) {
       print('🛑 [ERROR] Failed to stop alarm notification: $e');

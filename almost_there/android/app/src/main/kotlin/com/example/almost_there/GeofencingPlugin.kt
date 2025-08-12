@@ -1,4 +1,4 @@
-package com.example.almost_there
+package com.vaas.almost_there
 
 import android.Manifest
 import android.app.PendingIntent
@@ -21,7 +21,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 
 class GeofencingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     companion object {
-        private const val CHANNEL = "com.example.almost_there/geofencing"
+        private const val CHANNEL = "com.vaas.almost_there/geofencing"
         private const val TAG = "GeofencingPlugin"
         private const val GEOFENCE_REQ_ID_PREFIX = "alarm_"
     }

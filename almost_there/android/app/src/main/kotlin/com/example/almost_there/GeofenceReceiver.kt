@@ -1,4 +1,4 @@
-package com.example.almost_there
+package com.vaas.almost_there
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -94,7 +94,7 @@ class GeofenceReceiver : BroadcastReceiver() {
         try {
             // This will be handled by the Flutter app when it's in foreground
             // For background processing, we rely on the foreground service
-            val intent = Intent("com.example.almost_there.ALARM_TRIGGERED").apply {
+            val intent = Intent("com.vaas.almost_there.ALARM_TRIGGERED").apply {
                 putExtra("alarmId", alarmId)
                 putExtra("timestamp", System.currentTimeMillis())
             }

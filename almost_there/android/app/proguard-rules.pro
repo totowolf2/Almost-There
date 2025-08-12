@@ -14,7 +14,7 @@
 }
 
 # Almost There app specific classes
--keep class com.example.almost_there.** { *; }
+-keep class com.vaas.almost_there.** { *; }
 
 # Google Play Services Location
 -keep class com.google.android.gms.location.** { *; }

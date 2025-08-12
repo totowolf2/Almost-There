@@ -1,4 +1,4 @@
-package com.example.almost_there
+package com.vaas.almost_there
 
 import android.content.Intent
 import android.os.Bundle
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     companion object {
         private const val TAG = "MainActivity"
-        private const val CHANNEL = "com.example.almost_there/main"
+        private const val CHANNEL = "com.vaas.almost_there/main"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

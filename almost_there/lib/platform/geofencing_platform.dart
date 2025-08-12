@@ -1,7 +1,9 @@
 import 'package:flutter/services.dart';
 
 class GeofencingPlatform {
-  static const MethodChannel _channel = MethodChannel('com.example.almost_there/geofencing');
+  static const MethodChannel _channel = MethodChannel(
+    'com.vaas.almost_there/geofencing',
+  );
 
   /// Add a geofence for the given alarm
   static Future<bool> addGeofence({
@@ -12,7 +14,9 @@ class GeofencingPlatform {
     int? expirationDuration,
   }) async {
     try {
-      print('🌍 [DEBUG] Adding geofence for alarm: $alarmId at ($latitude, $longitude) radius: ${radius}m');
+      print(
+        '🌍 [DEBUG] Adding geofence for alarm: $alarmId at ($latitude, $longitude) radius: ${radius}m',
+      );
       final result = await _channel.invokeMethod('addGeofence', {
         'alarmId': alarmId,
         'latitude': latitude,
@@ -66,7 +70,9 @@ class GeofencingPlatform {
   /// Check if the app has background location permission
   static Future<bool> hasBackgroundLocationPermission() async {
     try {
-      final result = await _channel.invokeMethod('hasBackgroundLocationPermission');
+      final result = await _channel.invokeMethod(
+        'hasBackgroundLocationPermission',
+      );
       return result == true;
     } catch (e) {
       print('Error checking background location permission: $e');
@@ -86,9 +92,13 @@ class GeofencingPlatform {
   }
 
   /// Start live card tracking service
-  static Future<bool> startLiveCardService(List<Map<String, dynamic>> alarms) async {
+  static Future<bool> startLiveCardService(
+    List<Map<String, dynamic>> alarms,
+  ) async {
     try {
-      print('📱 [DEBUG] Starting live card service with ${alarms.length} alarms');
+      print(
+        '📱 [DEBUG] Starting live card service with ${alarms.length} alarms',
+      );
       print('📱 [DEBUG] Alarm data: $alarms');
       final result = await _channel.invokeMethod('startLiveCardService', {
         'alarms': alarms,
