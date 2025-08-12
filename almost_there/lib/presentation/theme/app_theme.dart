@@ -8,10 +8,10 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: lightColorScheme,
       extensions: const [lightColorExtension],
-      
+
       // Typography
       textTheme: _textTheme(lightColorScheme),
-      
+
       // App Bar Theme
       appBarTheme: AppBarTheme(
         elevation: 0,
@@ -20,9 +20,9 @@ class AppTheme {
         foregroundColor: lightColorScheme.onSurface,
         surfaceTintColor: lightColorScheme.surfaceTint,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        titleTextStyle: _textTheme(lightColorScheme).titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
+        titleTextStyle: _textTheme(
+          lightColorScheme,
+        ).titleLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
 
       // Card Theme
@@ -30,9 +30,7 @@ class AppTheme {
         elevation: 2,
         color: lightColorScheme.surface,
         surfaceTintColor: lightColorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       // Elevated Button Theme
@@ -42,9 +40,7 @@ class AppTheme {
           backgroundColor: lightColorScheme.primary,
           foregroundColor: lightColorScheme.onPrimary,
           surfaceTintColor: lightColorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -53,9 +49,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: lightColorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
       ),
@@ -65,9 +59,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: lightColorScheme.primary,
           side: BorderSide(color: lightColorScheme.outline),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -92,20 +84,23 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: lightColorScheme.error),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
       ),
 
       // Switch Theme
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return lightColorScheme.primary;
+            return lightColorScheme.secondary;
           }
           return lightColorScheme.outline;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return lightColorScheme.primary.withOpacity(0.5);
+            return lightColorScheme.secondary.withOpacity(0.5);
           }
           return lightColorScheme.surfaceContainerHighest;
         }),
@@ -131,9 +126,7 @@ class AppTheme {
         iconColor: lightColorScheme.onSurface,
         textColor: lightColorScheme.onSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
 
       // Floating Action Button Theme
@@ -157,9 +150,7 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: lightColorScheme.surface,
         surfaceTintColor: lightColorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -169,10 +160,10 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: darkColorScheme,
       extensions: const [darkColorExtension],
-      
+
       // Typography
       textTheme: _textTheme(darkColorScheme),
-      
+
       // App Bar Theme
       appBarTheme: AppBarTheme(
         elevation: 0,
@@ -181,9 +172,9 @@ class AppTheme {
         foregroundColor: darkColorScheme.onSurface,
         surfaceTintColor: darkColorScheme.surfaceTint,
         systemOverlayStyle: SystemUiOverlayStyle.light,
-        titleTextStyle: _textTheme(darkColorScheme).titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
+        titleTextStyle: _textTheme(
+          darkColorScheme,
+        ).titleLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
 
       // Card Theme
@@ -191,9 +182,7 @@ class AppTheme {
         elevation: 2,
         color: darkColorScheme.surface,
         surfaceTintColor: darkColorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       // Elevated Button Theme
@@ -203,9 +192,7 @@ class AppTheme {
           backgroundColor: darkColorScheme.primary,
           foregroundColor: darkColorScheme.onPrimary,
           surfaceTintColor: darkColorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -214,9 +201,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: darkColorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
       ),
@@ -226,9 +211,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: darkColorScheme.primary,
           side: BorderSide(color: darkColorScheme.outline),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         ),
       ),
@@ -253,7 +236,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: darkColorScheme.error),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
       ),
 
       // Switch Theme
@@ -292,9 +278,7 @@ class AppTheme {
         iconColor: darkColorScheme.onSurface,
         textColor: darkColorScheme.onSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
 
       // Floating Action Button Theme
@@ -318,9 +302,7 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: darkColorScheme.surface,
         surfaceTintColor: darkColorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
