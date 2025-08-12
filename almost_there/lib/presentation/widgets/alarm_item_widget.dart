@@ -49,7 +49,10 @@ class AlarmItemWidget extends StatelessWidget {
               else
                 Switch(
                   value: alarm.enabled,
-                  onChanged: onToggle,
+                  onChanged: (value) {
+                    print('🔄 [DEBUG] Switch toggled for ${alarm.label}: $value (was ${alarm.enabled})');
+                    onToggle(value);
+                  },
                 ),
               
               const SizedBox(width: 16),

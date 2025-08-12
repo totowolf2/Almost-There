@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.embedding.engine.dart.DartExecutor
 
 class NotificationActionReceiver : BroadcastReceiver() {
     companion object {
@@ -51,6 +54,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
         context.sendBroadcast(broadcastIntent)
         
+        // Also send to Flutter via method channel
+        sendEventToFlutter(context, "ALARM_SNOOZED", alarmId, minutes)
+        
         // Schedule re-trigger with a smaller geofence for snooze functionality
         scheduleSnoozeAlarm(context, alarmId, minutes)
         
@@ -77,6 +83,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
             putExtra("timestamp", System.currentTimeMillis())
         }
         context.sendBroadcast(broadcastIntent)
+        
+        // Also send to Flutter via method channel
+        sendEventToFlutter(context, "ALARM_DISMISSED", alarmId, null)
         
         // Stop the foreground service if no more active alarms
         val serviceIntent = Intent(context, GeofencingService::class.java).apply {
@@ -154,6 +163,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
             Log.d(TAG, "Snooze alarm scheduled for $minutes minutes")
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling snooze alarm", e)
+        }
+    }
+    
+    private fun sendEventToFlutter(context: Context, eventType: String, alarmId: String, snoozeMinutes: Int?) {
+        try {
+            // Try to get the method channel through MainActivity
+            val mainActivityIntent = Intent(context, MainActivity::class.java).apply {
+                action = "SEND_FLUTTER_EVENT"
+                putExtra("eventType", eventType)
+                putExtra("alarmId", alarmId)
+                snoozeMinutes?.let { putExtra("snoozeMinutes", it) }
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            context.startActivity(mainActivityIntent)
+            Log.d(TAG, "Sent event to Flutter: $eventType for alarm: $alarmId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending event to Flutter", e)
         }
     }
 }

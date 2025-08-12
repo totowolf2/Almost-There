@@ -9,6 +9,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'data/models/alarm_model.dart';
 import 'data/models/location_model.dart';
 import 'data/models/settings_model.dart';
+import 'presentation/providers/alarm_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/alarms/alarms_list_screen.dart';
 import 'presentation/screens/onboarding/permissions_screen.dart';
@@ -80,6 +81,19 @@ void _setupMainActivityChannel() {
             // Navigate to home and trigger alarm display
             _handleAlarmEvent(alarmId);
             break;
+          case 'ALARM_DISMISSED':
+            // Handle alarm dismiss
+            _handleAlarmDismissed(alarmId);
+            break;
+          case 'ALARM_SNOOZED':
+            // Handle alarm snooze
+            final snoozeMinutes = call.arguments['snoozeMinutes'] as int? ?? 5;
+            _handleAlarmSnoozed(alarmId, snoozeMinutes);
+            break;
+          case 'ALARM_TRIGGERED':
+            // Handle alarm trigger
+            _handleAlarmTriggered(alarmId);
+            break;
         }
         break;
       default:
@@ -102,6 +116,81 @@ void _handleAlarmEvent(String alarmId) {
       SnackBar(
         content: Text('เปิดแอปจากการแจ้งเตือนปลุก: $alarmId'),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+void _handleAlarmDismissed(String alarmId) {
+  print('📱 [DEBUG] Handling alarm dismissed for: $alarmId');
+  
+  // Get the provider container to update alarm state
+  final container = ProviderScope.containerOf(navigatorKey.currentContext!);
+  final alarmNotifier = container.read(alarmsProvider.notifier);
+  
+  // Update the alarm state to dismissed/disabled for one-time alarms
+  alarmNotifier.triggerAlarm(alarmId).then((_) {
+    print('📱 [DEBUG] Alarm $alarmId marked as triggered/disabled');
+    
+    // Re-register geofences to reflect the updated state
+    alarmNotifier.registerActiveGeofences().then((_) {
+      print('📱 [DEBUG] Geofences updated after alarm dismissal');
+    });
+  }).catchError((error) {
+    print('📱 [ERROR] Failed to handle alarm dismissal: $error');
+  });
+  
+  // Show user feedback
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🔕 ปลุกถูกปิดแล้ว'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+}
+
+void _handleAlarmSnoozed(String alarmId, int snoozeMinutes) {
+  print('📱 [DEBUG] Handling alarm snoozed for: $alarmId, minutes: $snoozeMinutes');
+  
+  // Show user feedback
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('😴 เลื่อนปลุกไป $snoozeMinutes นาที'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+}
+
+void _handleAlarmTriggered(String alarmId) {
+  print('📱 [DEBUG] Handling alarm triggered for: $alarmId');
+  
+  // Get the provider container to update alarm state
+  final container = ProviderScope.containerOf(navigatorKey.currentContext!);
+  final alarmNotifier = container.read(alarmsProvider.notifier);
+  
+  // Update the alarm's last triggered time
+  alarmNotifier.triggerAlarm(alarmId).then((_) {
+    print('📱 [DEBUG] Alarm $alarmId marked as triggered');
+  }).catchError((error) {
+    print('📱 [ERROR] Failed to update alarm trigger: $error');
+  });
+  
+  // Show user feedback
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('⏰ ปลุกถูกเรียกแล้ว!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.red,
       ),
     );
   }

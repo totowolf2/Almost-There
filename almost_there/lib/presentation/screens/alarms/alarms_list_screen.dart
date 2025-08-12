@@ -266,14 +266,18 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
     try {
       final alarmNotifier = ref.read(alarmsProvider.notifier);
       
-      // Update the alarm's enabled state
+      // Update the alarm's enabled state immediately for UI responsiveness
       final alarm = ref.read(alarmsProvider).firstWhere((a) => a.id == alarmId);
       final updatedAlarm = alarm.copyWith(
         enabled: enabled,
         // For one-time alarms, set isActive = enabled
         isActive: alarm.type == AlarmType.oneTime ? enabled : alarm.isActive,
       );
+      
+      // Update alarm in database - this should trigger UI update immediately
       await alarmNotifier.updateAlarm(updatedAlarm);
+      
+      print('🔄 [DEBUG] Alarm state updated in database');
       
       // If we're enabling the alarm, register geofences and start tracking
       if (enabled) {

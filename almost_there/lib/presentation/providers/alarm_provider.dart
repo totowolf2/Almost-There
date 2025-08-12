@@ -87,8 +87,26 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   }
 
   Future<void> updateAlarm(AlarmModel alarm) async {
+    print('📝 [DEBUG] updateAlarm called for alarm: ${alarm.label}, enabled: ${alarm.enabled}');
+    
+    // Update the state immediately for UI responsiveness
+    final index = state.indexWhere((a) => a.id == alarm.id);
+    if (index != -1) {
+      final updatedList = [...state];
+      updatedList[index] = alarm;
+      state = updatedList;
+      print('📝 [DEBUG] State updated immediately, alarm enabled: ${state[index].enabled}');
+    } else {
+      print('📝 [ERROR] Could not find alarm with id: ${alarm.id}');
+    }
+    
+    // Then save to database
     await _repository.saveAlarm(alarm);
+    print('📝 [DEBUG] Alarm saved to database');
+    
+    // Reload from database to ensure consistency
     _loadAlarms();
+    print('📝 [DEBUG] Alarms reloaded from database');
   }
 
   Future<void> deleteAlarm(String alarmId) async {
@@ -106,7 +124,18 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   Future<void> toggleAlarm(String alarmId) async {
     final alarm = state.firstWhere((a) => a.id == alarmId);
     final updatedAlarm = alarm.copyWith(enabled: !alarm.enabled);
-    await updateAlarm(updatedAlarm);
+    
+    // Update UI immediately
+    final index = state.indexWhere((a) => a.id == alarmId);
+    if (index != -1) {
+      final updatedList = [...state];
+      updatedList[index] = updatedAlarm;
+      state = updatedList;
+    }
+    
+    // Save to database
+    await _repository.saveAlarm(updatedAlarm);
+    _loadAlarms();
   }
 
   Future<void> enableAlarms(List<String> alarmIds) async {

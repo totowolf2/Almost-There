@@ -55,19 +55,27 @@ class MainActivity : FlutterActivity() {
                 Log.d(TAG, "Opening app from alarm map action")
                 sendAlarmEventToFlutter("OPEN_ALARM_MAP", alarmId)
             }
+            "SEND_FLUTTER_EVENT" -> {
+                Log.d(TAG, "Sending Flutter event")
+                val eventType = intent.getStringExtra("eventType")
+                val snoozeMinutes = intent.getIntExtra("snoozeMinutes", 0)
+                sendAlarmEventToFlutter(eventType ?: "", alarmId, if (snoozeMinutes > 0) snoozeMinutes else null)
+            }
         }
     }
 
-    private fun sendAlarmEventToFlutter(eventType: String, alarmId: String?) {
+    private fun sendAlarmEventToFlutter(eventType: String, alarmId: String?, snoozeMinutes: Int? = null) {
         if (alarmId == null) return
 
         try {
             val channel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger ?: return, CHANNEL)
-            val arguments = mapOf(
+            val arguments = mutableMapOf(
                 "eventType" to eventType,
                 "alarmId" to alarmId,
                 "timestamp" to System.currentTimeMillis()
             )
+            
+            snoozeMinutes?.let { arguments["snoozeMinutes"] = it }
             
             channel.invokeMethod("onAlarmEvent", arguments)
             Log.d(TAG, "Sent alarm event to Flutter: $eventType for alarm: $alarmId")
