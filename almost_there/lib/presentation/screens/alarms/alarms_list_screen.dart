@@ -151,10 +151,11 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.location_on_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.outline,
+          Image.asset(
+            'assets/empty_list_icon.png',
+            width: 300,
+            height: 300,
+            // color: Theme.of(context).colorScheme.outline,
           ),
           const SizedBox(height: 16),
           Text(

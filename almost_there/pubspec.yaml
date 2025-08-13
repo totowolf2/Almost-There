@@ -88,6 +88,7 @@ flutter:
   # App Assets
   assets:
     - assets/icon.png
+    - assets/empty_list_icon.png
     - assets/sounds/
 
   # An image asset can refer to one or more resolution-specific "variants", see
