@@ -137,7 +137,7 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
           ),
         ],
       ),
-      floatingActionButton: _isMultiSelectMode
+      floatingActionButton: _isMultiSelectMode || alarms.isEmpty
           ? null
           : FloatingActionButton(
               onPressed: _addNewAlarm,
