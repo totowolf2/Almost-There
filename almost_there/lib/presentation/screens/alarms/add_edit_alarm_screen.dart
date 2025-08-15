@@ -38,6 +38,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
   LocationModel? _selectedLocation;
   double _radius = 300.0;
   String? _groupName;
+  TimeOfDay? _startTime;
 
   bool get _isEditing => widget.alarm != null;
 
@@ -59,6 +60,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
       _selectedLocation = alarm.location;
       _radius = alarm.radius;
       _groupName = alarm.groupName;
+      _startTime = alarm.startTime;
     } else {
       // Initialize with default values from settings
       final settings = ref.read(settingsProvider);
@@ -162,6 +164,36 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
               ),
               const SizedBox(height: 24),
             ],
+            
+            // Start time picker
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.access_time),
+                title: const Text('เวลาเริ่มทำงาน'),
+                subtitle: Text(_startTime != null 
+                  ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
+                  : 'ทำงานทันทีเมื่อเปิดใช้งาน'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_startTime != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _startTime = null;
+                          });
+                        },
+                        tooltip: 'ลบเวลาเริ่มทำงาน',
+                      ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+                onTap: _pickStartTime,
+              ),
+            ),
+            
+            const SizedBox(height: 16),
             
             // Location picker
             Card(
@@ -270,6 +302,25 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
         ),
       ),
     );
+  }
+
+  void _pickStartTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startTime = picked;
+      });
+    }
   }
 
   void _pickLocation() async {
@@ -412,6 +463,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
           snoozeMinutes: _snoozeMinutes,
           recurringDays: _selectedDays,
           groupName: _groupName,
+          startTime: _startTime,
         );
         await alarmNotifier.updateAlarm(updatedAlarm);
       } else {
@@ -427,6 +479,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
           snoozeMinutes: _snoozeMinutes,
           recurringDays: _selectedDays,
           groupName: _groupName,
+          startTime: _startTime,
         );
       }
 

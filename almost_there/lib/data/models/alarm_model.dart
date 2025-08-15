@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'location_model.dart';
 
@@ -59,6 +60,9 @@ class AlarmModel extends HiveObject {
   @HiveField(14)
   DateTime? expiresAt; // For one-time alarms: auto-disable after 24 hours
 
+  @HiveField(15)
+  int? startTimeMinutes; // Start time in minutes since midnight (for Hive storage)
+
   AlarmModel({
     required this.id,
     required this.label,
@@ -75,11 +79,28 @@ class AlarmModel extends HiveObject {
     this.isActive = false,
     this.groupName,
     this.expiresAt,
+    this.startTimeMinutes,
   });
 
   // Helper methods
   bool get isOneTime => type == AlarmType.oneTime;
   bool get isRecurring => type == AlarmType.recurring;
+
+  // TimeOfDay getter/setter for UI convenience
+  TimeOfDay? get startTime {
+    if (startTimeMinutes == null) return null;
+    final hours = startTimeMinutes! ~/ 60;
+    final minutes = startTimeMinutes! % 60;
+    return TimeOfDay(hour: hours, minute: minutes);
+  }
+
+  void setStartTime(TimeOfDay? time) {
+    if (time == null) {
+      startTimeMinutes = null;
+    } else {
+      startTimeMinutes = time.hour * 60 + time.minute;
+    }
+  }
 
   bool get isExpired {
     if (type == AlarmType.oneTime && expiresAt != null) {
@@ -89,15 +110,43 @@ class AlarmModel extends HiveObject {
   }
 
   bool shouldTriggerToday() {
+    final result = _shouldTriggerTodayInternal();
+    print('🎯 [DEBUG] shouldTriggerToday for "$label": $result (enabled=$enabled, isActive=$isActive, isExpired=$isExpired, isWithinWindow=${isWithinActiveTimeWindow()})');
+    return result;
+  }
+
+  bool _shouldTriggerTodayInternal() {
     if (type == AlarmType.oneTime) {
-      return enabled && isActive && !isExpired;
+      return enabled && isActive && !isExpired && isWithinActiveTimeWindow();
     }
     
     if (type == AlarmType.recurring) {
       final today = DateTime.now().weekday % 7; // Convert to 0 = Sunday format
-      return enabled && recurringDays.contains(today);
+      return enabled && recurringDays.contains(today) && isWithinActiveTimeWindow();
     }
     
+    return false;
+  }
+
+  bool isWithinActiveTimeWindow() {
+    if (startTime == null) return true; // No start time restriction
+    
+    final now = DateTime.now();
+    final currentMinutes = now.hour * 60 + now.minute;
+    final startMinutes = startTime!.hour * 60 + startTime!.minute;
+    final result = currentMinutes >= startMinutes;
+    
+    print('🕐 [DEBUG] isWithinActiveTimeWindow for "$label": $result (current=$currentMinutes >= start=$startMinutes)');
+    
+    // Check if current time (in minutes) is at or after start time
+    return result;
+  }
+
+  bool shouldBeActivatedNow() {
+    // For one-time alarms with start time that are enabled but not active
+    if (type == AlarmType.oneTime && enabled && !isActive && startTime != null) {
+      return isWithinActiveTimeWindow();
+    }
     return false;
   }
 
@@ -123,6 +172,13 @@ class AlarmModel extends HiveObject {
     return sortedDays.map((day) => dayNames[day]).join(', ');
   }
 
+  String get formattedStartTime {
+    if (startTime == null) return 'ทันที';
+    final hour = startTime!.hour.toString().padLeft(2, '0');
+    final minute = startTime!.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   // Create copy with modifications
   AlarmModel copyWith({
     String? id,
@@ -140,6 +196,7 @@ class AlarmModel extends HiveObject {
     bool? isActive,
     String? groupName,
     DateTime? expiresAt,
+    TimeOfDay? startTime,
   }) {
     return AlarmModel(
       id: id ?? this.id,
@@ -157,6 +214,9 @@ class AlarmModel extends HiveObject {
       isActive: isActive ?? this.isActive,
       groupName: groupName ?? this.groupName,
       expiresAt: expiresAt ?? this.expiresAt,
+      startTimeMinutes: startTime != null 
+          ? (startTime.hour * 60 + startTime.minute)
+          : startTimeMinutes,
     );
   }
 

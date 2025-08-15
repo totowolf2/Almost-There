@@ -32,13 +32,14 @@ class AlarmModelAdapter extends TypeAdapter<AlarmModel> {
       isActive: fields[12] as bool,
       groupName: fields[13] as String?,
       expiresAt: fields[14] as DateTime?,
+      startTimeMinutes: fields[15] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AlarmModel obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -68,7 +69,9 @@ class AlarmModelAdapter extends TypeAdapter<AlarmModel> {
       ..writeByte(13)
       ..write(obj.groupName)
       ..writeByte(14)
-      ..write(obj.expiresAt);
+      ..write(obj.expiresAt)
+      ..writeByte(15)
+      ..write(obj.startTimeMinutes);
   }
 
   @override

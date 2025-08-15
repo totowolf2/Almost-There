@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -36,13 +38,85 @@ final liveCardAlarmsProvider = Provider<List<AlarmModel>>((ref) {
 
 class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   final AlarmRepository _repository;
+  Timer? _startTimeCheckTimer;
 
   AlarmsNotifier(this._repository) : super([]) {
     _loadAlarms();
+    _startPeriodicStartTimeCheck();
+  }
+
+  @override
+  void dispose() {
+    _startTimeCheckTimer?.cancel();
+    super.dispose();
   }
 
   void _loadAlarms() {
     state = _repository.getAllAlarms();
+    // Check for alarms that should be activated immediately on app start
+    Future.microtask(() => checkAndActivateScheduledAlarms());
+  }
+
+  void _startPeriodicStartTimeCheck() {
+    // Check every 10 seconds for alarms that should be activated
+    _startTimeCheckTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      checkAndActivateScheduledAlarms();
+    });
+    print('🕐 [DEBUG] Started periodic start time check every 10 seconds');
+  }
+
+  bool _isStartTimePassed(TimeOfDay? startTime) {
+    if (startTime == null) return true;
+    
+    final now = DateTime.now();
+    final currentMinutes = now.hour * 60 + now.minute;
+    final startMinutes = startTime.hour * 60 + startTime.minute;
+    
+    return currentMinutes >= startMinutes;
+  }
+
+  Future<void> checkAndActivateScheduledAlarms() async {
+    await _checkAndActivateScheduledAlarmsInternal();
+    
+    // Check if we need to re-register geofences due to time window changes
+    final currentActiveAlarms = state.where((alarm) => alarm.shouldTriggerToday()).length;
+    print('🕐 [DEBUG] Currently active alarms that should trigger: $currentActiveAlarms');
+    
+    // If the time has passed and we have alarms that should now be active, re-register geofences
+    if (currentActiveAlarms > 0) {
+      print('🕐 [DEBUG] 🎯 Re-registering geofences due to active alarms');
+      await _registerActiveGeofencesInternal();
+    }
+  }
+
+  Future<void> _checkAndActivateScheduledAlarmsInternal() async {
+    final now = DateTime.now();
+    final currentTime = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    print('🕐 [DEBUG] Checking for alarms that should be activated now at $currentTime...');
+    
+    // Debug: Show all alarms with start times
+    final alarmsWithStartTime = state.where((alarm) => alarm.startTime != null).toList();
+    for (final alarm in alarmsWithStartTime) {
+      print('🕐 [DEBUG] Alarm "${alarm.label}": startTime=${alarm.formattedStartTime}, enabled=${alarm.enabled}, isActive=${alarm.isActive}, shouldBeActivated=${alarm.shouldBeActivatedNow()}');
+    }
+    
+    final alarmsToActivate = state.where((alarm) => alarm.shouldBeActivatedNow()).toList();
+    
+    for (final alarm in alarmsToActivate) {
+      print('🕐 [DEBUG] 🎯 ACTIVATING alarm: ${alarm.label} at ${alarm.formattedStartTime}');
+      
+      final activatedAlarm = alarm.copyWith(isActive: true);
+      await updateAlarm(activatedAlarm);
+      
+      // Re-register geofences to include the newly activated alarm
+      await registerActiveGeofences();
+    }
+    
+    if (alarmsToActivate.isNotEmpty) {
+      print('🕐 [DEBUG] ✅ Activated ${alarmsToActivate.length} alarms');
+    } else if (alarmsWithStartTime.isNotEmpty) {
+      print('🕐 [DEBUG] ⏳ No alarms ready for activation yet');
+    }
   }
 
   Future<void> addAlarm({
@@ -56,6 +130,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     int snoozeMinutes = 5,
     List<int> recurringDays = const [],
     String? groupName,
+    TimeOfDay? startTime,
   }) async {
     print('📝 [DEBUG] Adding alarm: $label, type: $type, enabled: $enabled');
 
@@ -72,12 +147,13 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       recurringDays: recurringDays,
       createdAt: DateTime.now(),
       groupName: groupName,
+      startTimeMinutes: startTime != null ? (startTime.hour * 60 + startTime.minute) : null,
       // Set expiration for one-time alarms (24 hours)
       expiresAt: type == AlarmType.oneTime
           ? DateTime.now().add(const Duration(hours: 24))
           : null,
-      // For one-time alarms that are enabled, automatically set isActive = true
-      isActive: type == AlarmType.oneTime && enabled,
+      // For one-time alarms: set active only if enabled and (no start time OR start time has passed)
+      isActive: type == AlarmType.oneTime && enabled && (startTime == null || _isStartTimePassed(startTime)),
     );
 
     print(
@@ -254,6 +330,11 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
 
   // Start live card tracking service
   Future<bool> startLiveCardTracking() async {
+    // Debug: Show all alarms for live card eligibility
+    for (final alarm in state) {
+      print('📱 [DEBUG] Alarm "${alarm.label}": shouldTrigger=${alarm.shouldTriggerToday()}, showLiveCard=${alarm.showLiveCard}, enabled=${alarm.enabled}');
+    }
+    
     final liveCardAlarms = state
         .where((alarm) => alarm.shouldTriggerToday() && alarm.showLiveCard)
         .toList();
@@ -289,6 +370,12 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
 
   // Register geofences for active alarms
   Future<void> registerActiveGeofences() async {
+    // First, check and activate any alarms that should be activated now
+    await _checkAndActivateScheduledAlarmsInternal();
+    await _registerActiveGeofencesInternal();
+  }
+
+  Future<void> _registerActiveGeofencesInternal() async {
     final activeAlarms = state
         .where((alarm) => alarm.shouldTriggerToday())
         .toList();
@@ -341,6 +428,10 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
         );
       }
     }
+    
+    // Start live card tracking after geofences are registered
+    print('🎯 [DEBUG] Starting live card tracking after geofence registration...');
+    await startLiveCardTracking();
   }
 
   // Check permissions and setup notifications

@@ -113,6 +113,25 @@ class AlarmItemWidget extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        // Start time indicator
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              alarm.formattedStartTime,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        ),
+                        
                         // Days for recurring alarms
                         if (alarm.isRecurring)
                           Row(
@@ -175,7 +194,7 @@ class AlarmItemWidget extends StatelessWidget {
                     ),
                     
                     // Status indicators
-                    if (alarm.isExpired || !alarm.enabled || (alarm.isOneTime && !alarm.isActive))
+                    if (alarm.isExpired || !alarm.enabled || (alarm.isOneTime && !alarm.isActive) || _isWaitingForStartTime())
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Row(
@@ -205,6 +224,20 @@ class AlarmItemWidget extends StatelessWidget {
                                 'Disabled',
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: Theme.of(context).colorScheme.outline,
+                                ),
+                              ),
+                            ] else if (_isWaitingForStartTime()) ...[
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.tertiary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'รอถึงเวลา ${alarm.formattedStartTime}',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.tertiary,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ] else if (alarm.isOneTime && !alarm.isActive) ...[
@@ -243,6 +276,19 @@ class AlarmItemWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool _isWaitingForStartTime() {
+    if (alarm.startTime == null || !alarm.enabled) return false;
+    
+    if (alarm.isOneTime && !alarm.isActive) {
+      final now = DateTime.now();
+      final currentMinutes = now.hour * 60 + now.minute;
+      final startMinutes = alarm.startTime!.hour * 60 + alarm.startTime!.minute;
+      return currentMinutes < startMinutes;
+    }
+    
+    return false;
   }
 
   String _formatLastTriggered(DateTime dateTime) {
