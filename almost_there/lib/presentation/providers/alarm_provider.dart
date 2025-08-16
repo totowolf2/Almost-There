@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/services/notification_alarm_service.dart';
 import '../../data/models/alarm_model.dart';
 import '../../data/models/location_model.dart';
 import '../../data/services/location_service.dart';
@@ -43,6 +44,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   AlarmsNotifier(this._repository) : super([]) {
     _loadAlarms();
     _startPeriodicStartTimeCheck();
+    _initializeBackgroundAlarmService();
   }
 
   @override
@@ -63,6 +65,17 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       checkAndActivateScheduledAlarms();
     });
     print('🕐 [DEBUG] Started periodic start time check every 10 seconds');
+  }
+
+  void _initializeBackgroundAlarmService() {
+    // Schedule all enabled alarms using native alarm service
+    try {
+      NotificationAlarmService.scheduleAllEnabledAlarms();
+      print('🔧 [DEBUG] Native alarm service scheduled all alarms');
+    } catch (e) {
+      print('❌ [ERROR] Failed to schedule native alarms: $e');
+      print('⚠️ [WARNING] Alarms will only work when app is open');
+    }
   }
 
   bool _isStartTimePassed(TimeOfDay? startTime) {
@@ -163,6 +176,16 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     await _repository.saveAlarm(alarm);
     _loadAlarms();
 
+    // Schedule notification activation if alarm has startTime
+    if (alarm.enabled && alarm.startTime != null) {
+      try {
+        await NotificationAlarmService.scheduleAlarmActivation(alarm);
+        print('⏰ [DEBUG] Notification alarm scheduled for: ${alarm.label}');
+      } catch (e) {
+        print('⚠️ [WARNING] Failed to schedule notification alarm: $e');
+      }
+    }
+
     print('📝 [DEBUG] Alarm saved and loaded. Total alarms: ${state.length}');
   }
 
@@ -188,6 +211,19 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     await _repository.saveAlarm(alarm);
     print('📝 [DEBUG] Alarm saved to database');
 
+    // Handle notification scheduling for alarm
+    try {
+      await NotificationAlarmService.cancelAlarmActivation(alarm.id);
+      if (alarm.enabled && alarm.startTime != null) {
+        await NotificationAlarmService.scheduleAlarmActivation(alarm);
+        print('⏰ [DEBUG] Notification alarm rescheduled for: ${alarm.label}');
+      } else {
+        print('⏰ [DEBUG] Notification alarm cancelled for: ${alarm.label}');
+      }
+    } catch (e) {
+      print('⚠️ [WARNING] Failed to update notification alarm schedule: $e');
+    }
+
     // Reload from database to ensure consistency
     _loadAlarms();
     print('📝 [DEBUG] Alarms reloaded from database');
@@ -205,6 +241,14 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       print('📝 [DEBUG] Alarm removed from state immediately');
     } else {
       print('📝 [ERROR] Could not find alarm with id: $alarmId');
+    }
+
+    // Cancel notification scheduling for deleted alarm
+    try {
+      await NotificationAlarmService.cancelAlarmActivation(alarmId);
+      print('⏰ [DEBUG] Notification alarm cancelled for deleted alarm: $alarmId');
+    } catch (e) {
+      print('⚠️ [WARNING] Failed to cancel notification alarm: $e');
     }
 
     // Then delete from database
