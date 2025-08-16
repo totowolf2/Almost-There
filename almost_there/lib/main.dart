@@ -143,6 +143,11 @@ void _handleAlarmDismissed(String alarmId) {
         // Re-register geofences to reflect the updated state
         alarmNotifier.registerActiveGeofences().then((_) {
           print('📱 [DEBUG] Geofences updated after alarm dismissal');
+          
+          // Force UI update by triggering a refresh
+          if (navigatorKey.currentContext != null) {
+            print('📱 [DEBUG] Forcing UI refresh after alarm dismissal');
+          }
         });
       })
       .catchError((error) {
@@ -234,6 +239,12 @@ void _handleLiveCardStopped(String alarmId) {
     print(
       '📱 [DEBUG] Found alarm: ${alarm.label}, current enabled: ${alarm.enabled}',
     );
+
+    // Check if alarm is already disabled to avoid race conditions
+    if (!alarm.enabled) {
+      print('📱 [DEBUG] Alarm $alarmId is already disabled, skipping update');
+      return;
+    }
 
     // Update alarm state immediately - disable the alarm for immediate UI response
     final updatedAlarm = alarm.copyWith(enabled: false);

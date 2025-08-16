@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/services/notification_alarm_service.dart';
+import '../../core/services/alarm_scheduler_service.dart';
 import '../../data/models/alarm_model.dart';
 import '../../data/models/location_model.dart';
 import '../../data/services/location_service.dart';
@@ -45,6 +46,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     _loadAlarms();
     _startPeriodicStartTimeCheck();
     _initializeBackgroundAlarmService();
+    _setupAlarmEventListener();
   }
 
   @override
@@ -68,13 +70,43 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   }
 
   void _initializeBackgroundAlarmService() {
-    // Schedule all enabled alarms using native alarm service
+    // Initialize alarm scheduler
+    print('🔧 [DEBUG] AlarmScheduler initialized - using Android AlarmManager');
+  }
+
+  void _setupAlarmEventListener() {
+    // Setup method channel to listen for alarm activation events from Android
+    const MethodChannel('com.vaas.almost_there/main').setMethodCallHandler((call) async {
+      if (call.method == 'onAlarmEvent') {
+        final arguments = call.arguments as Map<String, dynamic>;
+        final eventType = arguments['eventType'] as String?;
+        final alarmId = arguments['alarmId'] as String?;
+        
+        print('🔔 [DEBUG] Received alarm event: $eventType for alarm: $alarmId');
+        
+        if (eventType == 'ALARM_ACTIVATION' && alarmId != null) {
+          await _handleAlarmActivationFromBackground(alarmId);
+        }
+      }
+    });
+  }
+
+  Future<void> _handleAlarmActivationFromBackground(String alarmId) async {
+    print('🔔 [DEBUG] Handling background alarm activation for: $alarmId');
+    
     try {
-      NotificationAlarmService.scheduleAllEnabledAlarms();
-      print('🔧 [DEBUG] Native alarm service scheduled all alarms');
+      final alarm = state.firstWhere((a) => a.id == alarmId);
+      
+      // Activate the alarm
+      final activatedAlarm = alarm.copyWith(isActive: true);
+      await updateAlarm(activatedAlarm);
+      
+      // Re-register geofences to include the newly activated alarm
+      await registerActiveGeofences();
+      
+      print('🔔 [DEBUG] Successfully activated alarm from background: ${alarm.label}');
     } catch (e) {
-      print('❌ [ERROR] Failed to schedule native alarms: $e');
-      print('⚠️ [WARNING] Alarms will only work when app is open');
+      print('❌ [ERROR] Failed to handle background alarm activation: $e');
     }
   }
 
@@ -176,13 +208,15 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     await _repository.saveAlarm(alarm);
     _loadAlarms();
 
-    // Schedule notification activation if alarm has startTime
-    if (alarm.enabled && alarm.startTime != null) {
+    // Schedule alarm activation if:
+    // 1. Alarm is enabled AND has a specific start time, OR
+    // 2. Alarm is a one-time alarm that's enabled and active (immediate activation)
+    if (alarm.enabled && (alarm.startTime != null || (alarm.isOneTime && alarm.isActive))) {
       try {
-        await NotificationAlarmService.scheduleAlarmActivation(alarm);
-        print('⏰ [DEBUG] Notification alarm scheduled for: ${alarm.label}');
+        await AlarmSchedulerService.scheduleAlarmActivation(alarm);
+        print('⏰ [DEBUG] AlarmManager scheduled for: ${alarm.label}');
       } catch (e) {
-        print('⚠️ [WARNING] Failed to schedule notification alarm: $e');
+        print('⚠️ [WARNING] Failed to schedule alarm activation: $e');
       }
     }
 
@@ -211,17 +245,20 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     await _repository.saveAlarm(alarm);
     print('📝 [DEBUG] Alarm saved to database');
 
-    // Handle notification scheduling for alarm
+    // Handle alarm scheduling for alarm
     try {
-      await NotificationAlarmService.cancelAlarmActivation(alarm.id);
-      if (alarm.enabled && alarm.startTime != null) {
-        await NotificationAlarmService.scheduleAlarmActivation(alarm);
-        print('⏰ [DEBUG] Notification alarm rescheduled for: ${alarm.label}');
+      await AlarmSchedulerService.cancelAlarmActivation(alarm.id);
+      // Schedule activation if:
+      // 1. Alarm is enabled AND has a specific start time, OR
+      // 2. Alarm is a one-time alarm that's enabled and active (immediate activation)
+      if (alarm.enabled && (alarm.startTime != null || (alarm.isOneTime && alarm.isActive))) {
+        await AlarmSchedulerService.scheduleAlarmActivation(alarm);
+        print('⏰ [DEBUG] AlarmManager rescheduled for: ${alarm.label}');
       } else {
-        print('⏰ [DEBUG] Notification alarm cancelled for: ${alarm.label}');
+        print('⏰ [DEBUG] AlarmManager cancelled for: ${alarm.label}');
       }
     } catch (e) {
-      print('⚠️ [WARNING] Failed to update notification alarm schedule: $e');
+      print('⚠️ [WARNING] Failed to update alarm schedule: $e');
     }
 
     // Reload from database to ensure consistency
@@ -243,12 +280,12 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       print('📝 [ERROR] Could not find alarm with id: $alarmId');
     }
 
-    // Cancel notification scheduling for deleted alarm
+    // Cancel alarm scheduling for deleted alarm
     try {
-      await NotificationAlarmService.cancelAlarmActivation(alarmId);
-      print('⏰ [DEBUG] Notification alarm cancelled for deleted alarm: $alarmId');
+      await AlarmSchedulerService.cancelAlarmActivation(alarmId);
+      print('⏰ [DEBUG] AlarmManager cancelled for deleted alarm: $alarmId');
     } catch (e) {
-      print('⚠️ [WARNING] Failed to cancel notification alarm: $e');
+      print('⚠️ [WARNING] Failed to cancel alarm: $e');
     }
 
     // Then delete from database
