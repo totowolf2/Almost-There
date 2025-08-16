@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -75,40 +74,11 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
   }
 
   void _setupAlarmEventListener() {
-    // Setup method channel to listen for alarm activation events from Android
-    const MethodChannel('com.vaas.almost_there/main').setMethodCallHandler((call) async {
-      if (call.method == 'onAlarmEvent') {
-        final arguments = call.arguments as Map<String, dynamic>;
-        final eventType = arguments['eventType'] as String?;
-        final alarmId = arguments['alarmId'] as String?;
-        
-        print('🔔 [DEBUG] Received alarm event: $eventType for alarm: $alarmId');
-        
-        if (eventType == 'ALARM_ACTIVATION' && alarmId != null) {
-          await _handleAlarmActivationFromBackground(alarmId);
-        }
-      }
-    });
+    // Note: Method channel is now setup in main.dart AppInitializer
+    // This method is kept for future background alarm activation handling
+    print('🔔 [DEBUG] Alarm event listener setup (method channel handled in main.dart)');
   }
 
-  Future<void> _handleAlarmActivationFromBackground(String alarmId) async {
-    print('🔔 [DEBUG] Handling background alarm activation for: $alarmId');
-    
-    try {
-      final alarm = state.firstWhere((a) => a.id == alarmId);
-      
-      // Activate the alarm
-      final activatedAlarm = alarm.copyWith(isActive: true);
-      await updateAlarm(activatedAlarm);
-      
-      // Re-register geofences to include the newly activated alarm
-      await registerActiveGeofences();
-      
-      print('🔔 [DEBUG] Successfully activated alarm from background: ${alarm.label}');
-    } catch (e) {
-      print('❌ [ERROR] Failed to handle background alarm activation: $e');
-    }
-  }
 
   bool _isStartTimePassed(TimeOfDay? startTime) {
     if (startTime == null) return true;
@@ -369,9 +339,15 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     // For one-time alarms, disable after triggering
     if (alarm.type == AlarmType.oneTime) {
       updatedAlarm = updatedAlarm.copyWith(enabled: false, isActive: false);
+      print('🔕 [DEBUG] One-time alarm $alarmId disabled: enabled=${updatedAlarm.enabled}, isActive=${updatedAlarm.isActive}');
     }
 
     await updateAlarm(updatedAlarm);
+    
+    // Ensure state is fully updated by waiting for next tick
+    await Future.delayed(const Duration(milliseconds: 50));
+    
+    print('🔕 [DEBUG] Alarm $alarmId trigger completed: enabled=${updatedAlarm.enabled}, isActive=${updatedAlarm.isActive}');
   }
 
   Future<void> duplicateAlarm(String alarmId) async {

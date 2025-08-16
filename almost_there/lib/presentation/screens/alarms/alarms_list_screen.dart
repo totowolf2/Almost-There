@@ -22,6 +22,7 @@ class _AlarmsListScreenState extends ConsumerState<AlarmsListScreen> {
   @override
   void initState() {
     super.initState();
+    print('🏠 [DEBUG] AlarmsListScreen.initState() called');
     // Check permissions on app startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPermissionsOnStartup();

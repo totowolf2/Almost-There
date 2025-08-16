@@ -18,10 +18,13 @@ import 'presentation/screens/onboarding/permissions_screen.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
+  print('🚀 [DEBUG] ========== Flutter App Starting ==========');
   WidgetsFlutterBinding.ensureInitialized();
+  print('🚀 [DEBUG] WidgetsFlutterBinding ensureInitialized completed');
 
   // Initialize Hive
   await Hive.initFlutter();
+  print('🚀 [DEBUG] Hive initialized');
 
   // Register Hive Adapters (will be generated)
   Hive.registerAdapter(AlarmModelAdapter());
@@ -54,16 +57,19 @@ Future<void> main() async {
     },
   );
 
-  // Setup method channel for MainActivity communication
-  _setupMainActivityChannel();
-
+  print('🚀 [DEBUG] About to run Flutter app...');
   runApp(const ProviderScope(child: AlmostThereApp()));
+  print('🚀 [DEBUG] Flutter app started successfully');
 }
 
 void _setupMainActivityChannel() {
+  print('🔧 [DEBUG] Setting up main activity method channel...');
   const channel = MethodChannel('com.vaas.almost_there/main');
+  print('🔧 [DEBUG] Created method channel with name: com.vaas.almost_there/main');
 
   channel.setMethodCallHandler((call) async {
+    print('🔔 [DEBUG] *** METHOD CHANNEL RECEIVED CALL: ${call.method} ***');
+    print('🔔 [DEBUG] Call arguments: ${call.arguments}');
     switch (call.method) {
       case 'onAlarmEvent':
         final eventType = call.arguments['eventType'] as String;
@@ -74,6 +80,9 @@ void _setupMainActivityChannel() {
 
         // Handle different alarm events
         switch (eventType) {
+          case 'TEST_CONNECTION':
+            print('🧪 [DEBUG] TEST_CONNECTION received successfully! Method channel is working!');
+            break;
           case 'ALARM_FULL_SCREEN':
           case 'OPEN_ALARM_MAP':
             // Navigate to home and trigger alarm display
@@ -106,6 +115,8 @@ void _setupMainActivityChannel() {
         print('📱 [DEBUG] Unknown method: ${call.method}');
     }
   });
+  
+  print('🔧 [DEBUG] Method channel setup completed successfully');
 }
 
 void _handleAlarmEvent(String alarmId) {
@@ -137,18 +148,20 @@ void _handleAlarmDismissed(String alarmId) {
   // Update the alarm state to dismissed/disabled for one-time alarms
   alarmNotifier
       .triggerAlarm(alarmId)
-      .then((_) {
+      .then((_) async {
         print('📱 [DEBUG] Alarm $alarmId marked as triggered/disabled');
 
+        // Add a small delay to ensure state changes are fully processed
+        await Future.delayed(const Duration(milliseconds: 100));
+        
         // Re-register geofences to reflect the updated state
-        alarmNotifier.registerActiveGeofences().then((_) {
-          print('📱 [DEBUG] Geofences updated after alarm dismissal');
-          
-          // Force UI update by triggering a refresh
-          if (navigatorKey.currentContext != null) {
-            print('📱 [DEBUG] Forcing UI refresh after alarm dismissal');
-          }
-        });
+        await alarmNotifier.registerActiveGeofences();
+        print('📱 [DEBUG] Geofences updated after alarm dismissal');
+        
+        // Force UI update by triggering a refresh
+        if (navigatorKey.currentContext != null) {
+          print('📱 [DEBUG] Forcing UI refresh after alarm dismissal');
+        }
       })
       .catchError((error) {
         print('📱 [ERROR] Failed to handle alarm dismissal: $error');
@@ -302,6 +315,7 @@ class AlmostThereApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('📱 [DEBUG] AlmostThereApp.build() called');
     return MaterialApp(
       title: 'Almost There!',
       navigatorKey: navigatorKey,
@@ -330,6 +344,14 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
+    print('🚀 [DEBUG] AppInitializer.initState() called');
+    
+    // Setup method channel after widget is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('🔧 [DEBUG] Setting up method channel after Flutter initialization...');
+      _setupMainActivityChannel();
+    });
+    
     _checkPermissionsAndNavigate();
   }
 
