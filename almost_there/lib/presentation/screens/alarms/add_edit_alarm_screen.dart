@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../data/models/alarm_model.dart';
 import '../../../data/models/location_model.dart';
+import '../../../data/services/holiday_service.dart';
 import '../../providers/alarm_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../map/map_picker_screen.dart';
@@ -39,6 +41,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
   double _radius = 300.0;
   String? _groupName;
   TimeOfDay? _startTime;
+  late bool _skipHolidays;
 
   bool get _isEditing => widget.alarm != null;
 
@@ -61,6 +64,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
       _radius = alarm.radius;
       _groupName = alarm.groupName;
       _startTime = alarm.startTime;
+      _skipHolidays = alarm.skipHolidays;
     } else {
       // Initialize with default values from settings
       final settings = ref.read(settingsProvider);
@@ -71,6 +75,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
       _snoozeMinutes = settings.defaultSnoozeMinutes;
       _soundPath = settings.defaultSound;
       _radius = settings.defaultRadius;
+      _skipHolidays = false;
     }
   }
 
@@ -285,6 +290,22 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
               },
             ),
             
+            SwitchListTile(
+              title: const Text('ข้ามวันหยุด'),
+              subtitle: const Text('ไม่แจ้งเตือนในวันหยุดตามปฏิทิน'),
+              value: _skipHolidays,
+              onChanged: (value) async {
+                setState(() {
+                  _skipHolidays = value;
+                });
+                
+                // Debug: Show holiday information when toggle is enabled
+                if (value) {
+                  await _debugShowHolidays();
+                }
+              },
+            ),
+            
             const SizedBox(height: 32),
             
             // Delete button for editing
@@ -464,6 +485,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
           recurringDays: _selectedDays,
           groupName: _groupName,
           startTime: _startTime,
+          skipHolidays: _skipHolidays,
         );
         await alarmNotifier.updateAlarm(updatedAlarm);
       } else {
@@ -480,6 +502,7 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
           recurringDays: _selectedDays,
           groupName: _groupName,
           startTime: _startTime,
+          skipHolidays: _skipHolidays,
         );
       }
 
@@ -551,5 +574,114 @@ class _AddEditAlarmScreenState extends ConsumerState<AddEditAlarmScreen> {
       return '${(radius / 1000).toStringAsFixed(1)} กม.';
     }
     return '${radius.toInt()} ม.';
+  }
+
+  Future<void> _debugShowHolidays() async {
+    final holidayService = HolidayService();
+    
+    try {
+      // Request calendar permissions first
+      print('🎄 [DEBUG] Requesting calendar permission...');
+      final hasPermission = await holidayService.requestCalendarPermission();
+      if (!hasPermission) {
+        print('🎄 [DEBUG] Calendar permission denied');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่ได้รับสิทธิ์เข้าถึงปฏิทิน กรุณาอนุญาตในการตั้งค่า'),
+              duration: Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'ตั้งค่า',
+                onPressed: openAppSettings,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      print('🎄 [DEBUG] Calendar permission granted');
+
+      // Find holiday calendars
+      print('🎄 [DEBUG] Finding holiday calendars...');
+      final holidayCalendars = await holidayService.findHolidayCalendars();
+      print('🎄 [DEBUG] Found ${holidayCalendars.length} holiday calendars');
+      
+      if (holidayCalendars.isEmpty) {
+        print('🎄 [DEBUG] No holiday calendars found');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่พบปฏิทินวันหยุด กรุณาเพิ่มปฏิทินวันหยุดไทยใน Google Calendar'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+      
+      for (final calendar in holidayCalendars) {
+        print('🎄 [DEBUG] Holiday calendar: ${calendar.name} (ID: ${calendar.id})');
+      }
+
+      // Use the first calendar found and load holidays for current year
+      print('🎄 [DEBUG] Using calendar: ${holidayCalendars.first.name}');
+      holidayService.setHolidayCalendar(holidayCalendars.first);
+      print('🎄 [DEBUG] Loading holidays for year ${DateTime.now().year}...');
+      await holidayService.loadHolidaysForYear(DateTime.now().year);
+
+      // Get the cached holidays
+      final holidays = holidayService.cachedHolidays;
+      final calendarInfo = holidayService.holidayCalendarInfo;
+
+      // Show debug information
+      if (holidays.isNotEmpty) {
+        final today = DateTime.now();
+        final isHolidayToday = await holidayService.isHoliday(today);
+        
+        // Find next few holidays from today
+        final upcomingHolidays = holidays
+            .where((holiday) => holiday.isAfter(today.subtract(const Duration(days: 1))))
+            .take(5)
+            .toList();
+
+        // Console debug logs
+        print('🎄 [DEBUG] Holiday Calendar Info: $calendarInfo');
+        print('🎄 [DEBUG] Today is holiday: $isHolidayToday');
+        print('🎄 [DEBUG] Total holidays in ${DateTime.now().year}: ${holidays.length}');
+        print('🎄 [DEBUG] All holidays: ${holidays.map((h) => "${h.day}/${h.month}/${h.year}").join(", ")}');
+        print('🎄 [DEBUG] Upcoming holidays: ${upcomingHolidays.map((h) => "${h.day}/${h.month}").join(", ")}');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'วันนี้เป็นวันหยุด: ${isHolidayToday ? "ใช่" : "ไม่"}\n'
+                'พบ ${holidays.length} วันหยุดในปี ${DateTime.now().year}\n'
+                'วันหยุดถัดไป 5 วัน: ${upcomingHolidays.map((h) => "${h.day}/${h.month}").join(", ")}'
+              ),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่พบวันหยุดในปฏิทิน'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการดึงข้อมูลวันหยุด: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

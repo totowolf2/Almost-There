@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'location_model.dart';
+import '../services/holiday_service.dart';
 
 part 'alarm_model.g.dart';
 
@@ -63,6 +64,9 @@ class AlarmModel extends HiveObject {
   @HiveField(15)
   int? startTimeMinutes; // Start time in minutes since midnight (for Hive storage)
 
+  @HiveField(16)
+  bool skipHolidays; // Skip triggering on holidays
+
   AlarmModel({
     required this.id,
     required this.label,
@@ -80,6 +84,7 @@ class AlarmModel extends HiveObject {
     this.groupName,
     this.expiresAt,
     this.startTimeMinutes,
+    this.skipHolidays = false,
   });
 
   // Helper methods
@@ -111,7 +116,6 @@ class AlarmModel extends HiveObject {
 
   bool shouldTriggerToday() {
     final result = _shouldTriggerTodayInternal();
-    print('🎯 [DEBUG] shouldTriggerToday for "$label": $result (enabled=$enabled, isActive=$isActive, isExpired=$isExpired, isWithinWindow=${isWithinActiveTimeWindow()})');
     return result;
   }
 
@@ -128,6 +132,24 @@ class AlarmModel extends HiveObject {
     return false;
   }
 
+  Future<bool> shouldTriggerTodayWithHolidayCheck() async {
+    // First check basic conditions
+    if (!shouldTriggerToday()) {
+      return false;
+    }
+    
+    // Check if today is a holiday and alarm should skip holidays
+    if (skipHolidays) {
+      final holidayService = HolidayService();
+      final isHolidayToday = await holidayService.isHoliday(DateTime.now());
+      if (isHolidayToday) {
+        return false; // Skip alarm on holidays
+      }
+    }
+    
+    return true;
+  }
+
   bool isWithinActiveTimeWindow() {
     if (startTime == null) return true; // No start time restriction
     
@@ -136,7 +158,7 @@ class AlarmModel extends HiveObject {
     final startMinutes = startTime!.hour * 60 + startTime!.minute;
     final result = currentMinutes >= startMinutes;
     
-    print('🕐 [DEBUG] isWithinActiveTimeWindow for "$label": $result (current=$currentMinutes >= start=$startMinutes)');
+    // Debug: Time window check
     
     // Check if current time (in minutes) is at or after start time
     return result;
@@ -197,6 +219,7 @@ class AlarmModel extends HiveObject {
     String? groupName,
     DateTime? expiresAt,
     TimeOfDay? startTime,
+    bool? skipHolidays,
   }) {
     return AlarmModel(
       id: id ?? this.id,
@@ -217,6 +240,7 @@ class AlarmModel extends HiveObject {
       startTimeMinutes: startTime != null 
           ? (startTime.hour * 60 + startTime.minute)
           : startTimeMinutes,
+      skipHolidays: skipHolidays ?? this.skipHolidays,
     );
   }
 

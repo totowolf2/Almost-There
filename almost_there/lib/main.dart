@@ -9,6 +9,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'data/models/alarm_model.dart';
 import 'data/models/location_model.dart';
 import 'data/models/settings_model.dart';
+import 'data/services/holiday_service.dart';
 import 'presentation/providers/alarm_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/alarms/alarms_list_screen.dart';
@@ -119,23 +120,44 @@ void _setupMainActivityChannel() {
   print('🔧 [DEBUG] Method channel setup completed successfully');
 }
 
-void _handleAlarmEvent(String alarmId) {
-  print('📱 [DEBUG] Handling alarm event for: $alarmId');
-
-  // Get the current context and navigate to home screen
+void _handleAlarmEvent(String alarmId) async {
+  // Get the provider container to check alarm details
   final context = navigatorKey.currentContext;
-  if (context != null) {
-    // If we're not on the home screen, navigate there
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-
-    // Show a snackbar to indicate the alarm was triggered
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('เปิดแอปจากการแจ้งเตือนปลุก: $alarmId'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  if (context == null) return;
+  
+  final container = ProviderScope.containerOf(context);
+  final alarms = container.read(alarmsProvider);
+  
+  // Find the alarm that triggered
+  final alarm = alarms.firstWhere(
+    (a) => a.id == alarmId,
+    orElse: () => throw Exception('Alarm not found: $alarmId'),
+  );
+  
+  // Check if alarm should skip holidays and if today is a holiday
+  if (alarm.skipHolidays) {
+    final holidayService = HolidayService();
+    final isHolidayToday = await holidayService.isHoliday(DateTime.now());
+    if (isHolidayToday) {
+      // Skip this alarm trigger due to holiday
+      return;
+    }
   }
+
+  // Check if context is still valid after async operations
+  final currentContext = navigatorKey.currentContext;
+  if (currentContext == null) return;
+
+  // If we're not on the home screen, navigate there
+  Navigator.of(currentContext).pushNamedAndRemoveUntil('/home', (route) => false);
+
+  // Show a snackbar to indicate the alarm was triggered
+  ScaffoldMessenger.of(currentContext).showSnackBar(
+    SnackBar(
+      content: Text('เปิดแอปจากการแจ้งเตือนปลุก: $alarmId'),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
 
 void _handleAlarmDismissed(String alarmId) {

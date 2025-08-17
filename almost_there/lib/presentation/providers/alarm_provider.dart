@@ -146,6 +146,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
     List<int> recurringDays = const [],
     String? groupName,
     TimeOfDay? startTime,
+    bool skipHolidays = false,
   }) async {
     print('📝 [DEBUG] Adding alarm: $label, type: $type, enabled: $enabled');
 
@@ -163,6 +164,7 @@ class AlarmsNotifier extends StateNotifier<List<AlarmModel>> {
       createdAt: DateTime.now(),
       groupName: groupName,
       startTimeMinutes: startTime != null ? (startTime.hour * 60 + startTime.minute) : null,
+      skipHolidays: skipHolidays,
       // Set expiration for one-time alarms (24 hours)
       expiresAt: type == AlarmType.oneTime
           ? DateTime.now().add(const Duration(hours: 24))
